@@ -1,0 +1,66 @@
+package io.github.lithum12.trackertips.network;
+
+import io.github.lithum12.trackertips.client.ClientHintManager;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.loading.FMLEnvironment;
+import net.minecraftforge.network.NetworkEvent;
+
+import java.util.function.Supplier;
+
+public class ShowHintPacket {
+
+    private final ResourceLocation id;
+    private final String textJson;
+    private final int duration;
+    private final int priority;
+    private final int accent;
+    private final String sound;
+
+    public ShowHintPacket(ResourceLocation id, String textJson, int duration, int priority, int accent, String sound) {
+        this.id = id;
+        this.textJson = textJson;
+        this.duration = duration;
+        this.priority = priority;
+        this.accent = accent;
+        this.sound = sound;
+    }
+
+    public static void encode(ShowHintPacket packet, FriendlyByteBuf buf) {
+        buf.writeResourceLocation(packet.id);
+        buf.writeUtf(packet.textJson, 32767);
+        buf.writeVarInt(packet.duration);
+        buf.writeVarInt(packet.priority);
+        buf.writeVarInt(packet.accent);
+        buf.writeUtf(packet.sound, 256);
+    }
+
+    public static ShowHintPacket decode(FriendlyByteBuf buf) {
+        return new ShowHintPacket(
+                buf.readResourceLocation(),
+                buf.readUtf(32767),
+                buf.readVarInt(),
+                buf.readVarInt(),
+                buf.readVarInt(),
+                buf.readUtf(256)
+        );
+    }
+
+    public static void handle(ShowHintPacket packet, Supplier<NetworkEvent.Context> ctxSupplier) {
+        NetworkEvent.Context ctx = ctxSupplier.get();
+        ctx.enqueueWork(() -> {
+            if (FMLEnvironment.dist == Dist.CLIENT) {
+                ClientHintManager.show(packet);
+            }
+        });
+        ctx.setPacketHandled(true);
+    }
+
+    public ResourceLocation id() { return id; }
+    public String textJson() { return textJson; }
+    public int duration() { return duration; }
+    public int priority() { return priority; }
+    public int accent() { return accent; }
+    public String sound() { return sound; }
+}
