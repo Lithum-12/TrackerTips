@@ -24,9 +24,11 @@ public class HintDefinition {
     private final String sound;
     private final JsonElement text;
     private final List<IHintTrigger> triggers;
+    private final JsonElement title;
+    private final String icon; // 物品 ID，例如 "minecraft:iron_sword"
 
     public HintDefinition(ResourceLocation id, boolean once, int priority, int cooldown, int duration,
-                          boolean requireAll, int accentColor, String sound, JsonElement text,
+                          boolean requireAll, int accentColor, String sound, JsonElement title, JsonElement text, String icon,
                           List<IHintTrigger> triggers) {
         this.id = id;
         this.once = once;
@@ -37,6 +39,8 @@ public class HintDefinition {
         this.accentColor = accentColor;
         this.sound = sound;
         this.text = text;
+        this.title = title;
+        this.icon = icon;
         this.triggers = triggers;
     }
 
@@ -49,7 +53,9 @@ public class HintDefinition {
         boolean requireAll = GsonHelper.getAsString(json, "require", "any").equalsIgnoreCase("all");
         int accent = (int) Long.parseLong(GsonHelper.getAsString(json, "accent", "F2C14E"), 16);
         String sound = GsonHelper.getAsString(json, "sound", "");
+        JsonElement title = json.has("title") ? json.get("title") : null;
         JsonElement text = json.get("text");
+        String icon = GsonHelper.getAsString(json, "icon", "");
 
         List<IHintTrigger> triggers = new ArrayList<>();
         JsonArray array = json.has("triggers") ? json.getAsJsonArray("triggers") : new JsonArray();
@@ -58,8 +64,7 @@ public class HintDefinition {
             ResourceLocation type = new ResourceLocation(GsonHelper.getAsString(triggerJson, "type"));
             triggers.add(Triggers.create(type, triggerJson));
         }
-
-        return new HintDefinition(id, once, priority, cooldown, duration, requireAll, accent, sound, text, triggers);
+        return new HintDefinition(id, once, priority, cooldown, duration, requireAll, accent, sound, title, text, icon, triggers);
     }
 
     public boolean matches(ServerPlayer player) {
@@ -90,4 +95,6 @@ public class HintDefinition {
     public int accentColor() { return accentColor; }
     public String sound() { return sound; }
     public JsonElement text() { return text; }
+    public JsonElement title() { return title; }
+    public String icon() { return icon; }
 }

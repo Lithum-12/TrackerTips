@@ -1,0 +1,17 @@
+{
+  "trackertips.config.enable": "Show Hint Overlay",
+  "trackertips.config.offset_x": "Bottom-left X Offset",
+  "trackertips.config.offset_y": "Bottom-left Y Offset (from bottom)",
+  "trackertips.config.max_width": "Max Hint Panel Width",
+  "trackertips.config.max_hints": "Max Visible Hints",
+  "trackertips.config.fade_in": "Fade-in Ticks",
+  "trackertips.config.fade_out": "Fade-out Ticks",
+
+  "trackertips.command.reload.success": "[TrackerTips] Config reloaded! %s hints loaded.",
+  "trackertips.command.test.sent": "[TrackerTips] Hint sent: %s",
+  "trackertips.command.test.not_found": "[TrackerTips] Unknown hint: %s",
+  "trackertips.command.test.player_only": "[TrackerTips] This command can only be run by a player.",
+
+  "trackertips.hint.welcome.title": "Welcome!",
+  "trackertips.hint.welcome.text": "Edit config/trackertips to customize your hints."
+}

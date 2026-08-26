@@ -17,13 +17,27 @@ public class TTClientConfig {
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
 
-        ENABLE = builder.comment("是否显示提示框").define("enable", true);
-        OFFSET_X = builder.comment("左下角 X 偏移").defineInRange("offset_x", 6, 0, 1000);
-        OFFSET_Y = builder.comment("左下角 Y 偏移（距底部）").defineInRange("offset_y", 4, 0, 1000);
-        MAX_WIDTH = builder.comment("提示框最大宽度").defineInRange("max_width", 260, 120, 600);
-        MAX_HINTS = builder.comment("最多同时显示几个提示").defineInRange("max_hints", 3, 1, 10);
-        FADE_IN = builder.comment("淡入 tick").defineInRange("fade_in", 6, 1, 100);
-        FADE_OUT = builder.comment("淡出 tick").defineInRange("fade_out", 10, 1, 100);
+        ENABLE = builder.comment("Enable the hint overlay")
+                .translation("trackertips.config.enable")
+                .define("enable", true);
+        OFFSET_X = builder.comment("Left-bottom X offset")
+                .translation("trackertips.config.offset_x")
+                .defineInRange("offset_x", 6, 0, 1000);
+        OFFSET_Y = builder.comment("Left-bottom Y offset from bottom")
+                .translation("trackertips.config.offset_y")
+                .defineInRange("offset_y", 45, 0, 1000);
+        MAX_WIDTH = builder.comment("Max hint panel width")
+                .translation("trackertips.config.max_width")
+                .defineInRange("max_width", 260, 120, 600);
+        MAX_HINTS = builder.comment("Max hints shown at once")
+                .translation("trackertips.config.max_hints")
+                .defineInRange("max_hints", 3, 1, 10);
+        FADE_IN = builder.comment("Fade-in ticks")
+                .translation("trackertips.config.fade_in")
+                .defineInRange("fade_in", 6, 1, 100);
+        FADE_OUT = builder.comment("Fade-out ticks")
+                .translation("trackertips.config.fade_out")
+                .defineInRange("fade_out", 10, 1, 100);
 
         SPEC = builder.build();
     }

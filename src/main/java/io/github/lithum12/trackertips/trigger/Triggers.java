@@ -15,6 +15,8 @@ public final class Triggers {
     public static void init() {
         register(new ResourceLocation(TrackerTips.MODID, "game_time"), GameTimeTrigger::fromJson);
         register(new ResourceLocation(TrackerTips.MODID, "potion_effect"), PotionEffectTrigger::fromJson);
+        register(new ResourceLocation(TrackerTips.MODID, "has_item"), HasItemTrigger::fromJson);
+        register(new ResourceLocation(TrackerTips.MODID, "advancement"), AdvancementTrigger::fromJson);
     }
 
     public static void register(ResourceLocation id, Function<JsonObject, IHintTrigger> factory) {

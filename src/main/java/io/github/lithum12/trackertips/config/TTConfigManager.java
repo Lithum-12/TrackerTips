@@ -51,6 +51,16 @@ public class TTConfigManager {
         }
     }
 
+    public static void reload(MinecraftServer server) {
+        try {
+            ensureGlobalDefaults();
+            load(server);
+            TrackerTips.LOGGER.info("[TrackerTips] 配置已重载！共加载 {} 个提示任务。", HINTS.size());
+        } catch (IOException e) {
+            TrackerTips.LOGGER.error("[TrackerTips] 配置重载失败", e);
+        }
+    }
+
     private static void ensureGlobalDefaults() throws IOException {
         Path folder = globalFolder();
         Files.createDirectories(folder.resolve("hints"));
@@ -131,6 +141,7 @@ public class TTConfigManager {
         }
     }
 
+    // 【修改点】使用了 translate 翻译键，并加上了 title 字段
     private static final String DEFAULT_WELCOME_JSON = """
             {
               "id": "trackertips:welcome",
@@ -141,9 +152,16 @@ public class TTConfigManager {
               "require": "all",
               "accent": "F2C14E",
               "sound": "minecraft:block.note_block.pling",
+              "title": {
+                "translate": "trackertips.hint.welcome.title",
+                "color": "gold",
+                "bold": true
+              },
               "text": [
-                { "text": "[TrackerTips] ", "color": "gold", "bold": true },
-                { "text": "欢迎！提示内容可在 config/trackertips 中自定义。", "color": "gray" }
+                {
+                  "translate": "trackertips.hint.welcome.text",
+                  "color": "gray"
+                }
               ],
               "triggers": [
                 { "type": "trackertips:game_time", "mode": "after", "time": 200 }

@@ -7,6 +7,9 @@ import io.github.lithum12.trackertips.network.TTNetwork;
 import io.github.lithum12.trackertips.player.PlayerHintData;
 import io.github.lithum12.trackertips.player.TTCapabilities;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
+import net.minecraft.resources.ResourceLocation;
 
 public class HintEngine {
 
@@ -47,14 +50,48 @@ public class HintEngine {
         }
 
         int duration = def.duration() >= 0 ? def.duration() : TTConfigManager.settings().defaultDuration;
+        String titleJson = def.title() != null ? def.title().toString() : "";
 
         TTNetwork.sendToPlayer(player, new ShowHintPacket(
                 def.id(),
                 def.text().toString(),
+                titleJson,
+                def.icon(),
                 duration,
                 def.priority(),
                 def.accentColor(),
                 def.sound()
         ));
+    } // <--- 这里就是刚才漏掉的大括号！
+
+    public static void forceShow(ServerPlayer player, ResourceLocation id) {
+        HintDefinition def = null;
+        for (HintDefinition d : TTConfigManager.hints()) {
+            if (d.id().equals(id)) {
+                def = d;
+                break;
+            }
+        }
+
+        if (def == null) {
+            player.sendSystemMessage(Component.translatable("trackertips.command.test.not_found", id).withStyle(ChatFormatting.RED));
+            return;
+        }
+
+        int duration = def.duration() >= 0 ? def.duration() : TTConfigManager.settings().defaultDuration;
+        String titleJson = def.title() != null ? def.title().toString() : "";
+
+        TTNetwork.sendToPlayer(player, new ShowHintPacket(
+                def.id(),
+                def.text().toString(),
+                titleJson,
+                def.icon(),
+                duration,
+                def.priority(),
+                def.accentColor(),
+                def.sound()
+        ));
+
+        player.sendSystemMessage(Component.translatable("trackertips.command.test.sent", id).withStyle(ChatFormatting.GREEN));
     }
 }

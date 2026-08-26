@@ -1,0 +1,17 @@
+{
+  "trackertips.config.enable": "显示提示框",
+  "trackertips.config.offset_x": "左下角 X 偏移",
+  "trackertips.config.offset_y": "左下角 Y 偏移（距底部）",
+  "trackertips.config.max_width": "提示框最大宽度",
+  "trackertips.config.max_hints": "最大同时显示数量",
+  "trackertips.config.fade_in": "淡入时长（tick）",
+  "trackertips.config.fade_out": "淡出时长（tick）",
+
+  "trackertips.command.reload.success": "[TrackerTips] 配置已热重载！共加载 %s 个任务。",
+  "trackertips.command.test.sent": "[TrackerTips] 已强制发送提示：%s",
+  "trackertips.command.test.not_found": "[TrackerTips] 找不到任务：%s",
+  "trackertips.command.test.player_only": "[TrackerTips] 该命令只能由玩家执行。",
+
+  "trackertips.hint.welcome.title": "欢迎！",
+  "trackertips.hint.welcome.text": "提示内容可在 config/trackertips 中自定义。"
+}

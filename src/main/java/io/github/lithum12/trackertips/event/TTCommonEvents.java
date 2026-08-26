@@ -16,6 +16,8 @@ import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.server.ServerAboutToStartEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.event.RegisterCommandsEvent;
+import io.github.lithum12.trackertips.command.TTCommands;
 
 @Mod.EventBusSubscriber(modid = TrackerTips.MODID)
 public class TTCommonEvents {
@@ -64,5 +66,10 @@ public class TTCommonEvents {
         if (event.getEntity() instanceof ServerPlayer serverPlayer) {
             HintEngine.checkPlayer(serverPlayer);
         }
+    }
+
+    @SubscribeEvent
+    public static void onRegisterCommands(RegisterCommandsEvent event) {
+        TTCommands.register(event.getDispatcher());
     }
 }

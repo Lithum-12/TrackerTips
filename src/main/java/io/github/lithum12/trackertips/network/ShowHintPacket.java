@@ -13,14 +13,19 @@ public class ShowHintPacket {
 
     private final ResourceLocation id;
     private final String textJson;
+    private final String titleJson;
+    private final String icon;
     private final int duration;
     private final int priority;
     private final int accent;
     private final String sound;
 
-    public ShowHintPacket(ResourceLocation id, String textJson, int duration, int priority, int accent, String sound) {
+    public ShowHintPacket(ResourceLocation id, String textJson, String titleJson, String icon,
+                          int duration, int priority, int accent, String sound) {
         this.id = id;
         this.textJson = textJson;
+        this.titleJson = titleJson;
+        this.icon = icon;
         this.duration = duration;
         this.priority = priority;
         this.accent = accent;
@@ -30,6 +35,8 @@ public class ShowHintPacket {
     public static void encode(ShowHintPacket packet, FriendlyByteBuf buf) {
         buf.writeResourceLocation(packet.id);
         buf.writeUtf(packet.textJson, 32767);
+        buf.writeUtf(packet.titleJson, 32767);
+        buf.writeUtf(packet.icon, 256);
         buf.writeVarInt(packet.duration);
         buf.writeVarInt(packet.priority);
         buf.writeVarInt(packet.accent);
@@ -40,6 +47,8 @@ public class ShowHintPacket {
         return new ShowHintPacket(
                 buf.readResourceLocation(),
                 buf.readUtf(32767),
+                buf.readUtf(32767),
+                buf.readUtf(256),
                 buf.readVarInt(),
                 buf.readVarInt(),
                 buf.readVarInt(),
@@ -59,6 +68,8 @@ public class ShowHintPacket {
 
     public ResourceLocation id() { return id; }
     public String textJson() { return textJson; }
+    public String titleJson() { return titleJson; }
+    public String icon() { return icon; }
     public int duration() { return duration; }
     public int priority() { return priority; }
     public int accent() { return accent; }
