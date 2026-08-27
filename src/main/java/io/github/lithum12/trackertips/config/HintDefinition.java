@@ -4,6 +4,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import io.github.lithum12.trackertips.trigger.IHintTrigger;
+import io.github.lithum12.trackertips.trigger.IEventHintTrigger;
+import io.github.lithum12.trackertips.trigger.TriggerEvent;
 import io.github.lithum12.trackertips.trigger.Triggers;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -51,7 +53,7 @@ public class HintDefinition {
         boolean once = GsonHelper.getAsBoolean(json, "once", true);
         int priority = GsonHelper.getAsInt(json, "priority", 0);
         int cooldown = GsonHelper.getAsInt(json, "cooldown", 0);
-        int duration = GsonHelper.getAsInt(json, "duration", 240); // 默认 12 秒倒计时；想要永久提示显式写 "duration": -1
+        int duration = GsonHelper.getAsInt(json, "duration", 240); // Defaults to a 12-second duration; use "duration": -1 for a persistent hint
         boolean requireAll = GsonHelper.getAsString(json, "require", "any").equalsIgnoreCase("all");
         int accent = (int) Long.parseLong(GsonHelper.getAsString(json, "accent", "F2C14E"), 16);
         String sound = GsonHelper.getAsString(json, "sound", "");
@@ -61,7 +63,7 @@ public class HintDefinition {
 
         // 【修改点 1】解析最大触发次数，0 表示无限次
         int maxTimes = GsonHelper.getAsInt(json, "max_times", 0);
-        // 【兼容逻辑】写了 "once": true 且没写 max_times 时，等价于最多 1 次
+        // Compatibility: "once": true without max_times is treated as a maximum of one trigger
         if (once && maxTimes <= 0) {
             maxTimes = 1;
         }
@@ -79,20 +81,53 @@ public class HintDefinition {
                 title, text, icon, triggers, maxTimes);
     }
 
+    /** 普通轮询：事件型触发器不参与，避免把事件型条件误当成持续状态。 */
     public boolean matches(ServerPlayer player) {
-        if (triggers.isEmpty()) {
-            return false;
+        if (triggers.isEmpty()) return false;
+
+        boolean hasStateTrigger = false;
+        boolean hasEventTrigger = false;
+        boolean result = requireAll;
+        for (IHintTrigger trigger : triggers) {
+            if (trigger instanceof IEventHintTrigger) {
+                hasEventTrigger = true;
+                continue;
+            }
+            hasStateTrigger = true;
+            boolean matched = trigger.test(player);
+            if (requireAll) result &= matched;
+            else result |= matched;
         }
+
+        // all 模式只要包含事件条件，就必须等对应 Forge 事件发生。
+        if (requireAll && hasEventTrigger) return false;
+        // 纯事件触发器当然也不能靠轮询触发。
+        if (!hasStateTrigger) return false;
+        return result;
+    }
+
+    /** Forge 原生事件触发：事件型条件由 event 提供，普通状态条件仍实时检查。 */
+    public boolean matchesEvent(ServerPlayer player, TriggerEvent event) {
+        if (triggers.isEmpty()) return false;
+
         if (requireAll) {
             for (IHintTrigger trigger : triggers) {
-                if (!trigger.test(player)) {
-                    return false;
+                boolean matched;
+                if (trigger instanceof IEventHintTrigger eventTrigger) {
+                    matched = eventTrigger.matchesEvent(player, event);
+                } else {
+                    matched = trigger.test(player);
                 }
+                if (!matched) return false;
             }
             return true;
         }
+
+        // any 模式下只有“当前事件对应的事件型 trigger”才有资格触发，
+        // 否则一次拾取物品可能把一个完全无关的 game_time hint 也触发出来。
         for (IHintTrigger trigger : triggers) {
-            if (trigger.test(player)) {
+            if (trigger instanceof IEventHintTrigger eventTrigger
+                    && eventTrigger.matchesEvent(player, event)) {
                 return true;
             }
         }

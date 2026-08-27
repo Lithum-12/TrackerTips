@@ -31,7 +31,7 @@ public final class Triggers {
     public static IHintTrigger create(ResourceLocation id, JsonObject json) {
         Function<JsonObject, IHintTrigger> factory = REGISTRY.get(id);
         if (factory == null) {
-            throw new IllegalArgumentException("未知触发器类型: " + id);
+            throw new IllegalArgumentException("Unknown trigger type: " + id);
         }
         return factory.apply(json);
     }

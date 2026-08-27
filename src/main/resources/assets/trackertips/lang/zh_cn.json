@@ -18,5 +18,16 @@
   "key.trackertips.dismiss": "关闭当前提示",
   "key.trackertips.toggle": "显示/隐藏提示",
   "trackertips.message.hints_on": "[TrackerTips] 提示已显示",
-  "trackertips.message.hints_off": "[TrackerTips] 提示已隐藏"
+  "trackertips.message.hints_off": "[TrackerTips] 提示已隐藏",
+  "trackertips.gui.title": "TrackerTips 设置",
+  "trackertips.gui.tab.general": "常规设置",
+  "trackertips.gui.tab.events": "事件设置",
+  "trackertips.gui.enable": "启用模组",
+  "trackertips.gui.debug": "调试模式",
+  "trackertips.gui.reset": "重置",
+  "trackertips.gui.save": "保存",
+  "trackertips.gui.saved": "配置已保存",
+  "trackertips.gui.events.placeholder": "事件管理器（阶段二实现）",
+  "trackertips.config.debug": "显示调试信息",
+  "key.trackertips.config": "打开 TrackerTips 设置"
 }

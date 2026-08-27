@@ -13,6 +13,7 @@ public class TTClientConfig {
     public static final ForgeConfigSpec.IntValue MAX_HINTS;
     public static final ForgeConfigSpec.IntValue FADE_IN;
     public static final ForgeConfigSpec.IntValue FADE_OUT;
+    public static final ForgeConfigSpec.BooleanValue DEBUG;
 
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
@@ -38,6 +39,9 @@ public class TTClientConfig {
         FADE_OUT = builder.comment("Fade-out ticks")
                 .translation("trackertips.config.fade_out")
                 .defineInRange("fade_out", 10, 1, 100);
+        DEBUG = builder.comment("Show debug info (hitbox / packet log)")
+                .translation("trackertips.config.debug")
+                .define("debug", false);
 
         SPEC = builder.build();
     }

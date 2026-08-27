@@ -8,24 +8,14 @@ import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraftforge.registries.ForgeRegistries;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
-
 /**
  * 药水效果触发器。
- * mode:
- *  - "added"   (默认) 刚获得效果的一瞬间触发（提示语义）
- *  - "active"  效果持续期间一直满足（状态语义，配合 cooldown）
- *  - "removed" 效果消失的一瞬间触发
+ * added / removed 使用 Forge 原生事件，active 使用普通状态轮询。
  */
-public class PotionEffectTrigger implements IHintTrigger {
-
+public class PotionEffectTrigger implements IEventHintTrigger {
     private final MobEffect effect;
     private final int amplifierMin;
     private final String mode;
-    // 记录每个玩家上一次检查时是否拥有该效果，用于检测“变化”
-    private final Map<UUID, Boolean> lastState = new HashMap<>();
 
     public PotionEffectTrigger(MobEffect effect, int amplifierMin, String mode) {
         this.effect = effect;
@@ -37,34 +27,33 @@ public class PotionEffectTrigger implements IHintTrigger {
         ResourceLocation id = new ResourceLocation(GsonHelper.getAsString(json, "effect"));
         MobEffect effect = ForgeRegistries.MOB_EFFECTS.getValue(id);
         if (effect == null) {
-            throw new IllegalArgumentException("[TrackerTips] 未知药水效果: " + id);
+            throw new IllegalArgumentException("[TrackerTips] Unknown effect: " + id);
         }
-        int amplifierMin = GsonHelper.getAsInt(json, "amplifier_min", 0);
-        String mode = GsonHelper.getAsString(json, "mode", "added");
-        return new PotionEffectTrigger(effect, amplifierMin, mode);
+        return new PotionEffectTrigger(effect,
+                GsonHelper.getAsInt(json, "amplifier_min", 0),
+                GsonHelper.getAsString(json, "mode", "added"));
+    }
+
+    @Override
+    public boolean matchesEvent(ServerPlayer player, TriggerEvent event) {
+        if ("active".equalsIgnoreCase(mode)) return false;
+        if (event.effect() == null) return false;
+        if (!hasEffect(event.effect())) return false;
+
+        if ("removed".equalsIgnoreCase(mode)) {
+            return event.type() == TriggerEvent.Type.POTION_REMOVED;
+        }
+        return event.type() == TriggerEvent.Type.POTION_ADDED;
     }
 
     @Override
     public boolean test(ServerPlayer player) {
-        boolean now = hasEffect(player);
-        Boolean last = lastState.get(player.getUUID());
-
-        // 第一次检查：只记录基准线，不触发（进游戏时身上已有的效果不算“新获得”）
-        if (last == null) {
-            lastState.put(player.getUUID(), now);
-            return false;
-        }
-        lastState.put(player.getUUID(), now);
-
-        return switch (mode) {
-            case "active" -> now;          // 状态：有就触发
-            case "removed" -> !now && last; // 下降沿：刚消失
-            default -> now && !last;        // 上升沿：刚获得
-        };
-    }
-
-    private boolean hasEffect(ServerPlayer player) {
+        if (!"active".equalsIgnoreCase(mode)) return false;
         MobEffectInstance instance = player.getEffect(effect);
         return instance != null && instance.getAmplifier() >= amplifierMin;
+    }
+
+    private boolean hasEffect(MobEffectInstance instance) {
+        return instance.getEffect() == effect && instance.getAmplifier() >= amplifierMin;
     }
 }

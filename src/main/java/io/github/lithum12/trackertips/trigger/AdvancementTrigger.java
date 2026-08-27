@@ -7,22 +7,11 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.GsonHelper;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
-
-/**
- * 进度触发器。
- * mode:
- *  - "done"  (默认) 刚达成进度的一瞬间触发（提示语义）
- *  - "state"  进度已完成就一直满足（状态语义）
- */
-public class AdvancementTrigger implements IHintTrigger {
-
+/** 进度触发器：done 使用 AdvancementEvent，state 使用状态轮询。 */
+public class AdvancementTrigger implements IEventHintTrigger {
     private final ResourceLocation advancementId;
     private final String mode;
-    private final Map<UUID, Boolean> lastState = new HashMap<>();
-    private boolean warned = false; // 只警告一次，防止刷屏
+    private boolean warned = false;
 
     public AdvancementTrigger(ResourceLocation advancementId, String mode) {
         this.advancementId = advancementId;
@@ -30,36 +19,31 @@ public class AdvancementTrigger implements IHintTrigger {
     }
 
     public static AdvancementTrigger fromJson(JsonObject json) {
-        ResourceLocation id = new ResourceLocation(GsonHelper.getAsString(json, "id"));
-        String mode = GsonHelper.getAsString(json, "mode", "done");
-        return new AdvancementTrigger(id, mode);
+        return new AdvancementTrigger(
+                new ResourceLocation(GsonHelper.getAsString(json, "id")),
+                GsonHelper.getAsString(json, "mode", "done"));
+    }
+
+    @Override
+    public boolean matchesEvent(ServerPlayer player, TriggerEvent event) {
+        if ("state".equalsIgnoreCase(mode) || event.type() != TriggerEvent.Type.ADVANCEMENT) {
+            return false;
+        }
+        Advancement advancement = event.advancement();
+        return advancement != null && advancementId.equals(advancement.getId());
     }
 
     @Override
     public boolean test(ServerPlayer player) {
+        if (!"state".equalsIgnoreCase(mode)) return false;
         Advancement advancement = player.getServer().getAdvancements().getAdvancement(advancementId);
         if (advancement == null) {
             if (!warned) {
                 warned = true;
-                TrackerTips.LOGGER.warn("[TrackerTips] 进度不存在，请检查 JSON 中的 id: {}", advancementId);
+                TrackerTips.LOGGER.warn("[TrackerTips] Advancement not found; check the JSON id: {}", advancementId);
             }
             return false;
         }
-
-        boolean now = player.getAdvancements().getOrStartProgress(advancement).isDone();
-        Boolean last = lastState.get(player.getUUID());
-
-        // 第一次检查：记录基准线
-        if (last == null) {
-            lastState.put(player.getUUID(), now);
-            // state 模式允许对“之前就完成”的进度提示；done 模式只认新达成
-            return "state".equals(mode) && now;
-        }
-        lastState.put(player.getUUID(), now);
-
-        return switch (mode) {
-            case "state" -> now;
-            default -> now && !last; // 上升沿：刚达成
-        };
+        return player.getAdvancements().getOrStartProgress(advancement).isDone();
     }
 }

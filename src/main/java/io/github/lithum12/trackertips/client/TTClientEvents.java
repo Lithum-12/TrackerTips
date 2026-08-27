@@ -24,6 +24,10 @@ public class TTClientEvents {
             return;
         }
 
+        while (TTKeyMappings.OPEN_CONFIG.consumeClick()) {
+            minecraft.setScreen(new io.github.lithum12.trackertips.client.gui.TTConfigScreen());
+        }
+
         // 按 H：关闭当前正在显示的提示
         while (TTKeyMappings.DISMISS_HINT.consumeClick()) {
             ClientHintManager.dismissCurrent();

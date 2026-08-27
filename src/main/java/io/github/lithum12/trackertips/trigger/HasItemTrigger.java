@@ -23,7 +23,7 @@ public class HasItemTrigger implements IHintTrigger {
         ResourceLocation id = new ResourceLocation(GsonHelper.getAsString(json, "item"));
         Item item = ForgeRegistries.ITEMS.getValue(id);
         if (item == null) {
-            throw new IllegalArgumentException("[TrackerTips] 未知物品: " + id);
+            throw new IllegalArgumentException("[TrackerTips] Unknown item: " + id);
         }
         int count = GsonHelper.getAsInt(json, "count", 1);
         return new HasItemTrigger(item, count);

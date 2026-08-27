@@ -18,5 +18,16 @@
   "key.trackertips.dismiss": "Dismiss Current Hint",
   "key.trackertips.toggle": "Toggle Hints",
   "trackertips.message.hints_on": "[TrackerTips] Hints shown",
-  "trackertips.message.hints_off": "[TrackerTips] Hints hidden"
+  "trackertips.message.hints_off": "[TrackerTips] Hints hidden",
+  "trackertips.gui.title": "TrackerTips Settings",
+  "trackertips.gui.tab.general": "General",
+  "trackertips.gui.tab.events": "Events",
+  "trackertips.gui.enable": "Enable Mod",
+  "trackertips.gui.debug": "Debug Mode",
+  "trackertips.gui.reset": "Reset",
+  "trackertips.gui.save": "Save",
+  "trackertips.gui.saved": "Settings saved",
+  "trackertips.gui.events.placeholder": "Event Manager (Phase 2)",
+  "trackertips.config.debug": "Show debug info",
+  "key.trackertips.config": "Open TrackerTips Settings"
 }

@@ -47,7 +47,7 @@ public class TTConfigManager {
             copyToWorldIfAbsent(server);
             load(server);
         } catch (IOException e) {
-            TrackerTips.LOGGER.error("[TrackerTips] 配置加载失败", e);
+            TrackerTips.LOGGER.error("[TrackerTips] Failed to load configuration", e);
         }
     }
 
@@ -55,9 +55,9 @@ public class TTConfigManager {
         try {
             ensureGlobalDefaults();
             load(server);
-            TrackerTips.LOGGER.info("[TrackerTips] 配置已重载！共加载 {} 个提示任务。", HINTS.size());
+            TrackerTips.LOGGER.info("[TrackerTips] Configuration reloaded; loaded {} hint definitions.", HINTS.size());
         } catch (IOException e) {
-            TrackerTips.LOGGER.error("[TrackerTips] 配置重载失败", e);
+            TrackerTips.LOGGER.error("[TrackerTips] Failed to reload configuration", e);
         }
     }
 
@@ -133,11 +133,11 @@ public class TTConfigManager {
                     HintDefinition def = HintDefinition.fromJson(json);
                     map.put(def.id(), def);
                 } catch (Exception e) {
-                    TrackerTips.LOGGER.error("[TrackerTips] 解析失败: {}", p, e);
+                    TrackerTips.LOGGER.error("[TrackerTips] Failed to parse: {}", p, e);
                 }
             });
         } catch (IOException e) {
-            TrackerTips.LOGGER.error("[TrackerTips] 读取文件夹失败: {}", folder, e);
+            TrackerTips.LOGGER.error("[TrackerTips] Failed to read directory: {}", folder, e);
         }
     }
 

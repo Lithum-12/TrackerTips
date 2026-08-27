@@ -27,5 +27,11 @@ public class TTKeyMappings {
     public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
         event.register(DISMISS_HINT);
         event.register(TOGGLE_HINT);
+        event.register(OPEN_CONFIG);
     }
+
+    public static final KeyMapping OPEN_CONFIG = new KeyMapping(
+            "key.trackertips.config",
+            InputConstants.KEY_K,
+            "key.categories.trackertips");
 }

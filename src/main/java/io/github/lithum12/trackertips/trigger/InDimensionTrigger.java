@@ -7,13 +7,10 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.GsonHelper;
 import net.minecraft.world.level.Level;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
 
-public class InDimensionTrigger implements IHintTrigger {
+/** 维度切换使用 PlayerChangedDimensionEvent；进入维度时只触发一次。 */
+public class InDimensionTrigger implements IEventHintTrigger {
     private final ResourceKey<Level> dimension;
-    private final Map<UUID, ResourceKey<Level>> lastDimension = new HashMap<>();
 
     public InDimensionTrigger(ResourceKey<Level> dimension) { this.dimension = dimension; }
 
@@ -23,12 +20,9 @@ public class InDimensionTrigger implements IHintTrigger {
     }
 
     @Override
-    public boolean test(ServerPlayer player) {
-        ResourceKey<Level> current = player.level().dimension();
-        ResourceKey<Level> last = lastDimension.get(player.getUUID());
-        if (last == null) { lastDimension.put(player.getUUID(), current); return false; }
-        lastDimension.put(player.getUUID(), current);
-        // 边缘触发：上一次不在，这一次在
-        return current.equals(dimension) && !last.equals(dimension);
+    public boolean matchesEvent(ServerPlayer player, TriggerEvent event) {
+        return event.type() == TriggerEvent.Type.DIMENSION_CHANGE
+                && dimension.equals(event.toDimension())
+                && !dimension.equals(event.fromDimension());
     }
 }
