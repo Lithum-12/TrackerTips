@@ -13,5 +13,10 @@
   "trackertips.command.test.player_only": "[TrackerTips] This command can only be run by a player.",
 
   "trackertips.hint.welcome.title": "Welcome!",
-  "trackertips.hint.welcome.text": "Edit config/trackertips to customize your hints."
+  "trackertips.hint.welcome.text": "Edit config/trackertips to customize your hints.",
+  "key.categories.trackertips": "TrackerTips",
+  "key.trackertips.dismiss": "Dismiss Current Hint",
+  "key.trackertips.toggle": "Toggle Hints",
+  "trackertips.message.hints_on": "[TrackerTips] Hints shown",
+  "trackertips.message.hints_off": "[TrackerTips] Hints hidden"
 }

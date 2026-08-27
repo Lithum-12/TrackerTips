@@ -25,11 +25,12 @@ public class HintDefinition {
     private final JsonElement text;
     private final List<IHintTrigger> triggers;
     private final JsonElement title;
-    private final String icon; // 物品 ID，例如 "minecraft:iron_sword"
+    private final String icon;
+    private final int maxTimes;
 
     public HintDefinition(ResourceLocation id, boolean once, int priority, int cooldown, int duration,
                           boolean requireAll, int accentColor, String sound, JsonElement title, JsonElement text, String icon,
-                          List<IHintTrigger> triggers) {
+                          List<IHintTrigger> triggers, int maxTimes) {
         this.id = id;
         this.once = once;
         this.priority = priority;
@@ -42,6 +43,7 @@ public class HintDefinition {
         this.title = title;
         this.icon = icon;
         this.triggers = triggers;
+        this.maxTimes = maxTimes;
     }
 
     public static HintDefinition fromJson(JsonObject json) {
@@ -49,13 +51,20 @@ public class HintDefinition {
         boolean once = GsonHelper.getAsBoolean(json, "once", true);
         int priority = GsonHelper.getAsInt(json, "priority", 0);
         int cooldown = GsonHelper.getAsInt(json, "cooldown", 0);
-        int duration = GsonHelper.getAsInt(json, "duration", -1);
+        int duration = GsonHelper.getAsInt(json, "duration", 240); // 默认 12 秒倒计时；想要永久提示显式写 "duration": -1
         boolean requireAll = GsonHelper.getAsString(json, "require", "any").equalsIgnoreCase("all");
         int accent = (int) Long.parseLong(GsonHelper.getAsString(json, "accent", "F2C14E"), 16);
         String sound = GsonHelper.getAsString(json, "sound", "");
         JsonElement title = json.has("title") ? json.get("title") : null;
         JsonElement text = json.get("text");
         String icon = GsonHelper.getAsString(json, "icon", "");
+
+        // 【修改点 1】解析最大触发次数，0 表示无限次
+        int maxTimes = GsonHelper.getAsInt(json, "max_times", 0);
+        // 【兼容逻辑】写了 "once": true 且没写 max_times 时，等价于最多 1 次
+        if (once && maxTimes <= 0) {
+            maxTimes = 1;
+        }
 
         List<IHintTrigger> triggers = new ArrayList<>();
         JsonArray array = json.has("triggers") ? json.getAsJsonArray("triggers") : new JsonArray();
@@ -64,7 +73,10 @@ public class HintDefinition {
             ResourceLocation type = new ResourceLocation(GsonHelper.getAsString(triggerJson, "type"));
             triggers.add(Triggers.create(type, triggerJson));
         }
-        return new HintDefinition(id, once, priority, cooldown, duration, requireAll, accent, sound, title, text, icon, triggers);
+
+        // 【修改点 2】把 maxTimes 传进构造器（第 13 个参数）
+        return new HintDefinition(id, once, priority, cooldown, duration, requireAll, accent, sound,
+                title, text, icon, triggers, maxTimes);
     }
 
     public boolean matches(ServerPlayer player) {
@@ -97,4 +109,7 @@ public class HintDefinition {
     public JsonElement text() { return text; }
     public JsonElement title() { return title; }
     public String icon() { return icon; }
+
+    // 【修改点 3】getter，HintEngine 里要用
+    public int maxTimes() { return maxTimes; }
 }
