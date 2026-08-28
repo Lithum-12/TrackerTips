@@ -28,11 +28,12 @@ public class HintDefinition {
     private final List<IHintTrigger> triggers;
     private final JsonElement title;
     private final String icon;
+    private final String theme;
     private final int maxTimes;
 
     public HintDefinition(ResourceLocation id, boolean once, int priority, int cooldown, int duration,
                           boolean requireAll, int accentColor, String sound, JsonElement title, JsonElement text, String icon,
-                          List<IHintTrigger> triggers, int maxTimes) {
+                          List<IHintTrigger> triggers, int maxTimes, String theme) {
         this.id = id;
         this.once = once;
         this.priority = priority;
@@ -46,6 +47,7 @@ public class HintDefinition {
         this.icon = icon;
         this.triggers = triggers;
         this.maxTimes = maxTimes;
+        this.theme = theme == null || theme.isBlank() ? "trackertips:default" : theme;
     }
 
     public static HintDefinition fromJson(JsonObject json) {
@@ -60,6 +62,7 @@ public class HintDefinition {
         JsonElement title = json.has("title") ? json.get("title") : null;
         JsonElement text = json.get("text");
         String icon = GsonHelper.getAsString(json, "icon", "");
+        String theme = GsonHelper.getAsString(json, "theme", "trackertips:default");
 
         // 【修改点 1】解析最大触发次数，0 表示无限次
         int maxTimes = GsonHelper.getAsInt(json, "max_times", 0);
@@ -78,7 +81,7 @@ public class HintDefinition {
 
         // 【修改点 2】把 maxTimes 传进构造器（第 13 个参数）
         return new HintDefinition(id, once, priority, cooldown, duration, requireAll, accent, sound,
-                title, text, icon, triggers, maxTimes);
+                title, text, icon, triggers, maxTimes, theme);
     }
 
     /** 普通轮询：事件型触发器不参与，避免把事件型条件误当成持续状态。 */
@@ -164,4 +167,5 @@ public class HintDefinition {
 
     // 【修改点 3】getter，HintEngine 里要用
     public int maxTimes() { return maxTimes; }
+    public String theme() { return theme; }
 }

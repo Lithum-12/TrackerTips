@@ -175,6 +175,7 @@ public class TTConfigManager {
               "duration": 240,
               "require": "all",
               "accent": "F2C14E",
+              "theme": "trackertips:default",
               "sound": "minecraft:block.note_block.pling",
               "title": {
                 "translate": "trackertips.hint.welcome.title",

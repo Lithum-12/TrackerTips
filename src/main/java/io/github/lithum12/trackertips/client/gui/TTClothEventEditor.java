@@ -45,6 +45,7 @@ public final class TTClothEventEditor {
         addInt(entry, general, "trackertips.gui.event.duration", json, "duration", 240);
         addString(entry, general, "trackertips.gui.event.require", json, "require", "any");
         addString(entry, general, "trackertips.gui.event.accent", json, "accent", "F2C14E");
+        addString(entry, general, "trackertips.gui.event.theme", json, "theme", "trackertips:default");
         addString(entry, general, "trackertips.gui.event.sound", json, "sound", "");
         addString(entry, general, "trackertips.gui.event.icon", json, "icon", "");
         addInt(entry, general, "trackertips.gui.event.max_times", json, "max_times", 0);

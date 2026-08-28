@@ -3,48 +3,56 @@ package io.github.lithum12.trackertips.client.gui;
 import io.github.lithum12.trackertips.config.TTClientConfig;
 import io.github.lithum12.trackertips.config.TTConfigManager;
 import io.github.lithum12.trackertips.config.TTSettings;
+import io.github.lithum12.trackertips.theme.TTThemeManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.CycleButton;
-import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.TabButton;
+import net.minecraft.client.gui.components.tabs.TabManager;
+import net.minecraft.client.gui.components.tabs.TabNavigationBar;
+import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
+import net.minecraft.client.gui.layouts.LinearLayout;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
+import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
- * Main TrackerTips configuration screen.
- *
- * Vanilla 1.19.4 / Create World style top navigation.
+ * TrackerTips configuration hub using Minecraft 1.20.1's native TabNavigationBar.
  */
 public class TTConfigScreen extends Screen {
-
     private final Screen parent;
+    private final HeaderAndFooterLayout layout;
+    private final TabManager tabManager;
+    private TabNavigationBar tabNavigationBar;
+    private List<TTConfigTab> tabs = List.of();
 
-    private enum Tab {
-        GENERAL,
-        EVENTS,
-        COMMANDS,
-        USAGE
-    }
+    private Button quitButton;
+    private Button saveButton;
+    private boolean changed;
 
-    private Tab currentTab = Tab.GENERAL;
-
-    // Pending values
     private boolean pendingEnable;
-    private int pendingMaxHints;
     private boolean pendingDebug;
-    private int pendingCheckInterval;
-    private int pendingDefaultDuration;
 
-    // Input boxes
-    private EditBox maxHintsBox;
-    private EditBox checkIntervalBox;
-    private EditBox defaultDurationBox;
+    private net.minecraft.client.gui.components.EditBox offsetXBox;
+    private net.minecraft.client.gui.components.EditBox offsetYBox;
+    private net.minecraft.client.gui.components.EditBox maxWidthBox;
+    private net.minecraft.client.gui.components.EditBox maxHintsBox;
+    private net.minecraft.client.gui.components.EditBox fadeInBox;
+    private net.minecraft.client.gui.components.EditBox fadeOutBox;
+    private net.minecraft.client.gui.components.EditBox checkIntervalBox;
+    private net.minecraft.client.gui.components.EditBox defaultDurationBox;
+
+    private static final Component CANCEL_LABEL = CommonComponents.GUI_CANCEL;
+    private static final Component QUIT_CONFIRM_TITLE =
+            Component.translatable("trackertips.gui.quit.confirm.title");
+    private static final Component QUIT_CONFIRM_WARNING =
+            Component.translatable("trackertips.gui.quit.confirm.warning");
 
     public TTConfigScreen() {
         this(null);
@@ -53,704 +61,212 @@ public class TTConfigScreen extends Screen {
     public TTConfigScreen(Screen parent) {
         super(Component.translatable("trackertips.gui.title"));
         this.parent = parent;
+        this.layout = new HeaderAndFooterLayout(this, 24, 33);
+        this.tabManager = new TabManager(this::addRenderableWidget, this::removeWidget);
 
         pendingEnable = TTClientConfig.ENABLE.get();
-        pendingMaxHints = TTClientConfig.MAX_HINTS.get();
-
-        TTSettings settings = TTConfigManager.readGlobalSettings();
-
-        pendingDebug = settings.debug;
-        pendingCheckInterval = settings.checkInterval;
-        pendingDefaultDuration = settings.defaultDuration;
+        pendingDebug = TTConfigManager.readGlobalSettings().debug;
+        TTThemeManager.ensureDefaults();
     }
 
     @Override
     protected void init() {
-        rebuild();
-    }
-
-    private void rebuild() {
         clearWidgets();
-        pendingLabels.clear();
+        this.tabs = new ArrayList<>();
 
-        maxHintsBox = null;
-        checkIntervalBox = null;
-        defaultDurationBox = null;
+        TabNavigationBar.Builder builder = TabNavigationBar.builder(tabManager, this.width);
 
-        buildTabs();
+        addTab(builder, TTConfigTab.Kind.GENERAL);
+        addTab(builder, TTConfigTab.Kind.EVENTS);
+        addTab(builder, TTConfigTab.Kind.THEMES);
+        addTab(builder, TTConfigTab.Kind.USAGE);
 
-        switch (currentTab) {
-            case GENERAL -> buildGeneral();
-            case EVENTS -> buildEvents();
-            case COMMANDS -> buildCommands();
-            case USAGE -> {
-            }
-        }
+        tabNavigationBar = builder.build();
+        initTabs(tabNavigationBar);
+        addRenderableWidget(tabNavigationBar);
 
-        buildBottomButtons();
-    }
+        LinearLayout footer = layout.addToFooter(new LinearLayout(0, 0, LinearLayout.Orientation.HORIZONTAL));
+        footer.defaultChildLayoutSetting().paddingHorizontal(4);
+        quitButton = footer.addChild(Button.builder(getQuitLabel(), b -> onClose()).width(200).build());
+        saveButton = footer.addChild(Button.builder(getSaveLabel(), b -> saveAndClose()).width(200).build());
 
-    /* ------------------------------------------------------------
-     * Top navigation
-     * ------------------------------------------------------------ */
-
-    private void buildTabs() {
-        int left = 20;
-        int width = this.width - 40;
-        int tabWidth = width / 4;
-
-        Tab[] tabs = Tab.values();
-
-        for (int i = 0; i < tabs.length; i++) {
-            final Tab tab = tabs[i];
-
-            Button button = Button.builder(
-                    Component.empty(),
-                    b -> {
-                        if (currentTab != tab) {
-                            currentTab = tab;
-                            rebuild();
-                        }
-                    }
-            ).bounds(
-                    left + i * tabWidth,
-                    25,
-                    tabWidth - 2,
-                    24
-            ).build();
-
-            // Hide the vanilla button appearance.
-            button.setAlpha(0.0F);
-
-            addRenderableWidget(button);
-        }
-    }
-
-    private Component getTabTitle(Tab tab) {
-        return switch (tab) {
-            case GENERAL ->
-                    Component.translatable("trackertips.gui.tab.general");
-
-            case EVENTS ->
-                    Component.translatable("trackertips.gui.tab.events");
-
-            case COMMANDS ->
-                    Component.translatable("trackertips.gui.tab.commands");
-
-            case USAGE ->
-                    Component.translatable("trackertips.gui.tab.usage");
-        };
-    }
-
-    private void renderTabs(GuiGraphics graphics) {
-        int left = 20;
-        int width = this.width - 40;
-        int tabWidth = width / 4;
-
-        for (int i = 0; i < Tab.values().length; i++) {
-            Tab tab = Tab.values()[i];
-
-            int x = left + i * tabWidth;
-            int right = x + tabWidth - 2;
-
-            boolean selected = currentTab == tab;
-
-            // Base tab area.
-            if (selected) {
-                graphics.fill(
-                        x,
-                        25,
-                        right,
-                        49,
-                        0xFF3F3F3F
-                );
-
-                // Vanilla-style selected underline.
-                graphics.fill(
-                        x,
-                        47,
-                        right,
-                        49,
-                        0xFFFFFFFF
-                );
-            } else {
-                graphics.fill(
-                        x,
-                        25,
-                        right,
-                        49,
-                        0x80202020
-                );
-            }
-
-            Component title = getTabTitle(tab);
-
-            graphics.drawCenteredString(
-                    font,
-                    title,
-                    x + tabWidth / 2,
-                    32,
-                    selected ? 0xFFFFFF : 0xAAAAAA
-            );
-        }
-    }
-
-    /* ------------------------------------------------------------
-     * General
-     * ------------------------------------------------------------ */
-
-    private void buildGeneral() {
-        int labelX = this.width / 2 - 180;
-        int controlX = this.width / 2 + 25;
-        int controlWidth = 155;
-
-        int y = 78;
-        int rowHeight = 38;
-
-        // Enable
-        addRenderableWidget(
-                CycleButton.booleanBuilder(
-                                Component.translatable("trackertips.value.yes"),
-                                Component.translatable("trackertips.value.no")
-                        )
-                        .withInitialValue(pendingEnable)
-                        .create(
-                                controlX,
-                                y,
-                                controlWidth,
-                                20,
-                                Component.empty(),
-                                (button, value) -> pendingEnable = value
-                        )
-        );
-
-        drawLabelLater(
-                Component.translatable("trackertips.gui.enable"),
-                labelX,
-                y + 6
-        );
-
-        // Max hints
-        maxHintsBox = createIntegerBox(
-                controlX,
-                y + rowHeight,
-                controlWidth,
-                pendingMaxHints
-        );
-
-        drawLabelLater(
-                Component.translatable("trackertips.gui.max_hints"),
-                labelX,
-                y + rowHeight + 6
-        );
-
-        // Check interval
-        checkIntervalBox = createIntegerBox(
-                controlX,
-                y + rowHeight * 2,
-                controlWidth,
-                pendingCheckInterval
-        );
-
-        drawLabelLater(
-                Component.translatable("trackertips.gui.check_interval"),
-                labelX,
-                y + rowHeight * 2 + 6
-        );
-
-        // Debug
-        addRenderableWidget(
-                CycleButton.booleanBuilder(
-                                Component.translatable("trackertips.value.yes"),
-                                Component.translatable("trackertips.value.no")
-                        )
-                        .withInitialValue(pendingDebug)
-                        .create(
-                                controlX,
-                                y + rowHeight * 3,
-                                controlWidth,
-                                20,
-                                Component.empty(),
-                                (button, value) -> pendingDebug = value
-                        )
-        );
-
-        drawLabelLater(
-                Component.translatable("trackertips.gui.debug"),
-                labelX,
-                y + rowHeight * 3 + 6
-        );
-
-        // Default duration
-        defaultDurationBox = createIntegerBox(
-                controlX,
-                y + rowHeight * 4,
-                controlWidth,
-                pendingDefaultDuration
-        );
-
-        drawLabelLater(
-                Component.translatable("trackertips.gui.default_duration"),
-                labelX,
-                y + rowHeight * 4 + 6
-        );
-    }
-
-    private EditBox createIntegerBox(
-            int x,
-            int y,
-            int width,
-            int value
-    ) {
-        EditBox box = new EditBox(
-                font,
-                x,
-                y,
-                width,
-                20,
-                Component.empty()
-        );
-
-        box.setValue(Integer.toString(value));
-        box.setFilter(s -> s.matches("-?\\d*"));
-        box.setResponder(valueString -> {
-            // Don't immediately mutate configuration.
-            // The actual value is validated when saving.
+        layout.visitWidgets(widget -> {
+            widget.setTabOrderGroup(1);
+            addRenderableWidget(widget);
         });
 
-        addRenderableWidget(box);
-
-        return box;
+        tabNavigationBar.selectTab(0, false);
+        repositionElements();
     }
 
-    /*
-     * Labels are rendered manually in render().
-     * This avoids the duplicated Yes/No / label problem.
-     */
-    private final List<LabelEntry> pendingLabels = new ArrayList<>();
-
-    private void drawLabelLater(Component text, int x, int y) {
-        pendingLabels.add(new LabelEntry(text, x, y));
+    private void addTab(TabNavigationBar.Builder builder, TTConfigTab.Kind kind) {
+        TTConfigTab tab = new TTConfigTab(this, kind);
+        tabs.add(tab);
+        builder.addTabs(tab);
     }
 
-    private record LabelEntry(Component text, int x, int y) {
-    }
-
-    /* ------------------------------------------------------------
-     * Events
-     * ------------------------------------------------------------ */
-
-    private void buildEvents() {
-        Path folder = TTConfigManager.globalFolder().resolve("hints");
-
-        List<Path> files = new ArrayList<>();
-
-        try {
-            if (Files.isDirectory(folder)) {
-                try (var stream = Files.list(folder)) {
-                    stream.filter(
-                                    p -> p.getFileName()
-                                            .toString()
-                                            .endsWith(".json")
-                            )
-                            .sorted()
-                            .forEach(files::add);
-                }
+    private void initTabs(TabNavigationBar bar) {
+        int i = 0;
+        for (var child : bar.children()) {
+            if (child instanceof TabButton button && i < tabs.size()) {
+                i++;
             }
-        } catch (Exception ignored) {
-        }
-
-        int x = this.width / 2 - 190;
-        int y = 64;
-
-        int rowHeight = 28;
-        int maxRows = Math.max(
-                1,
-                (this.height - 150) / rowHeight
-        );
-
-        if (files.isEmpty()) {
-            addRenderableWidget(
-                    Button.builder(
-                                    Component.translatable(
-                                            "trackertips.gui.add_event"
-                                    ),
-                                    b -> Minecraft.getInstance().setScreen(
-                                            TTNewEventScreen.create(this)
-                                    )
-                            )
-                            .bounds(
-                                    this.width / 2 - 100,
-                                    85,
-                                    200,
-                                    20
-                            )
-                            .build()
-            );
-        }
-
-        for (int i = 0; i < Math.min(files.size(), maxRows); i++) {
-            Path file = files.get(i);
-
-            int rowY = y + i * rowHeight;
-
-            addRenderableWidget(
-                    Button.builder(
-                                    Component.literal(
-                                            file.getFileName().toString()
-                                    ),
-                                    b -> openEvent(file)
-                            )
-                            .bounds(x, rowY, 220, 20)
-                            .build()
-            );
-
-            addRenderableWidget(
-                    Button.builder(
-                                    Component.translatable(
-                                            "trackertips.gui.edit"
-                                    ),
-                                    b -> openEvent(file)
-                            )
-                            .bounds(x + 225, rowY, 70, 20)
-                            .build()
-            );
-
-            addRenderableWidget(
-                    Button.builder(
-                                    Component.translatable(
-                                            "trackertips.gui.delete"
-                                    ),
-                                    b -> confirmDelete(file)
-                            )
-                            .bounds(x + 300, rowY, 70, 20)
-                            .build()
-            );
-        }
-
-        if (!files.isEmpty()) {
-            int actionsY = Math.min(
-                    y + maxRows * rowHeight + 5,
-                    this.height - 62
-            );
-
-            addRenderableWidget(
-                    Button.builder(
-                                    Component.translatable(
-                                            "trackertips.gui.add_event"
-                                    ),
-                                    b -> Minecraft.getInstance().setScreen(
-                                            TTNewEventScreen.create(this)
-                                    )
-                            )
-                            .bounds(
-                                    this.width / 2 - 105,
-                                    actionsY,
-                                    100,
-                                    20
-                            )
-                            .build()
-            );
-
-            addRenderableWidget(
-                    Button.builder(
-                                    Component.translatable(
-                                            "trackertips.gui.refresh"
-                                    ),
-                                    b -> rebuild()
-                            )
-                            .bounds(
-                                    this.width / 2 + 5,
-                                    actionsY,
-                                    100,
-                                    20
-                            )
-                            .build()
-            );
         }
     }
 
-    /* ------------------------------------------------------------
-     * Commands
-     * ------------------------------------------------------------ */
-
-    private void buildCommands() {
-        int y = 78;
-
-        addRenderableWidget(
-                Button.builder(
-                                Component.translatable(
-                                        "trackertips.gui.reload_command"
-                                ),
-                                b -> {
-                                    if (Minecraft.getInstance().player != null) {
-                                        Minecraft.getInstance()
-                                                .player
-                                                .connection
-                                                .sendCommand(
-                                                        "trackertips reload"
-                                                );
-                                    }
-                                }
-                        )
-                        .bounds(
-                                this.width / 2 - 90,
-                                y,
-                                180,
-                                20
-                        )
-                        .build()
-        );
+    @Override
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        renderBackground(graphics);
+        super.render(graphics, mouseX, mouseY, partialTick);
     }
 
-    /* ------------------------------------------------------------
-     * Bottom buttons
-     * ------------------------------------------------------------ */
+    @Override
+    protected void repositionElements() {
+        refresh();
 
-    private void buildBottomButtons() {
-        int bottom = this.height - 32;
+        if (tabNavigationBar != null) {
+            tabNavigationBar.setWidth(this.width);
+            tabNavigationBar.arrangeElements();
+            int top = tabNavigationBar.getRectangle().bottom();
 
-        addRenderableWidget(
-                Button.builder(
-                                Component.translatable("gui.cancel"),
-                                b -> onClose()
-                        )
-                        .bounds(
-                                this.width / 2 - 155,
-                                bottom,
-                                100,
-                                20
-                        )
-                        .build()
-        );
-
-        addRenderableWidget(
-                Button.builder(
-                                Component.translatable("gui.done"),
-                                b -> saveAndClose()
-                        )
-                        .bounds(
-                                this.width / 2 - 50,
-                                bottom,
-                                100,
-                                20
-                        )
-                        .build()
-        );
-
-        addRenderableWidget(
-                Button.builder(
-                                Component.translatable(
-                                        "trackertips.gui.restore_defaults"
-                                ),
-                                b -> restoreDefaults()
-                        )
-                        .bounds(
-                                this.width / 2 + 55,
-                                bottom,
-                                100,
-                                20
-                        )
-                        .build()
-        );
+            ScreenRectangle area = new ScreenRectangle(
+                    0,
+                    top,
+                    this.width,
+                    this.height - layout.getFooterHeight() - top
+            );
+            tabManager.setTabArea(area);
+            layout.setHeaderHeight(top);
+            layout.arrangeElements();
+        }
     }
 
-    /* ------------------------------------------------------------
-     * Event operations
-     * ------------------------------------------------------------ */
-
-    private void openEvent(Path file) {
-        Minecraft.getInstance().setScreen(
-                TTClothEventEditor.create(this, file)
-        );
+    public void reopenTabs() {
+        Minecraft.getInstance().setScreen(new TTConfigScreen(parent));
     }
 
-    private void confirmDelete(Path file) {
-        Minecraft.getInstance().setScreen(
-                TTConfirmScreen.create(
-                        this,
-                        Component.translatable(
-                                "trackertips.gui.delete_confirm",
-                                file.getFileName()
-                        ),
-                        () -> {
-                            try {
-                                Files.deleteIfExists(file);
-                            } catch (Exception ignored) {
-                            }
-
-                            rebuild();
-                        }
-                )
-        );
+    public void markChanged() {
+        changed = true;
+        refresh();
     }
 
-    /* ------------------------------------------------------------
-     * Defaults / saving
-     * ------------------------------------------------------------ */
-
-    private void restoreDefaults() {
-        pendingEnable = true;
-        pendingMaxHints = 3;
-        pendingDebug = false;
-        pendingCheckInterval = 20;
-        pendingDefaultDuration = 240;
-
-        rebuild();
+    void setPendingEnable(boolean value) {
+        pendingEnable = value;
+        markChanged();
     }
 
-    private int readInteger(EditBox box, int fallback) {
-        if (box == null) {
-            return fallback;
+    void setPendingDebug(boolean value) {
+        pendingDebug = value;
+        markChanged();
+    }
+
+    void setOffsetXBox(net.minecraft.client.gui.components.EditBox box) { offsetXBox = box; }
+    void setOffsetYBox(net.minecraft.client.gui.components.EditBox box) { offsetYBox = box; }
+    void setMaxWidthBox(net.minecraft.client.gui.components.EditBox box) { maxWidthBox = box; }
+    void setMaxHintsBox(net.minecraft.client.gui.components.EditBox box) { maxHintsBox = box; }
+    void setFadeInBox(net.minecraft.client.gui.components.EditBox box) { fadeInBox = box; }
+    void setFadeOutBox(net.minecraft.client.gui.components.EditBox box) { fadeOutBox = box; }
+    void setCheckIntervalBox(net.minecraft.client.gui.components.EditBox box) { checkIntervalBox = box; }
+    void setDefaultDurationBox(net.minecraft.client.gui.components.EditBox box) { defaultDurationBox = box; }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (tabManager.getCurrentTab() instanceof TTConfigTab tab) {
+            // Let focused child widgets consume the key first.
+        }
+        return tabNavigationBar.keyPressed(keyCode) || super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public void onClose() {
+        if (!changed) {
+            Minecraft.getInstance().setScreen(parent);
+            return;
         }
 
+        Minecraft.getInstance().setScreen(new ConfirmScreen(
+                confirmed -> Minecraft.getInstance().setScreen(confirmed ? parent : this),
+                QUIT_CONFIRM_TITLE,
+                QUIT_CONFIRM_WARNING,
+                CommonComponents.GUI_YES,
+                CANCEL_LABEL
+        ));
+    }
+
+    private int read(net.minecraft.client.gui.components.EditBox box, int fallback, int min, int max) {
+        if (box == null) return fallback;
         try {
-            return Integer.parseInt(box.getValue().trim());
-        } catch (NumberFormatException e) {
+            int value = Integer.parseInt(box.getValue().trim());
+            return Math.max(min, Math.min(max, value));
+        } catch (Exception ignored) {
             return fallback;
         }
     }
 
     private void saveAndClose() {
-        pendingMaxHints = Math.max(
-                1,
-                readInteger(maxHintsBox, pendingMaxHints)
-        );
+        int oldOffsetX = TTClientConfig.OFFSET_X.get();
+        int oldOffsetY = TTClientConfig.OFFSET_Y.get();
+        int oldMaxWidth = TTClientConfig.MAX_WIDTH.get();
+        int oldMaxHints = TTClientConfig.MAX_HINTS.get();
+        int oldFadeIn = TTClientConfig.FADE_IN.get();
+        int oldFadeOut = TTClientConfig.FADE_OUT.get();
 
-        pendingCheckInterval = Math.max(
-                1,
-                readInteger(checkIntervalBox, pendingCheckInterval)
-        );
-
-        pendingDefaultDuration = readInteger(
-                defaultDurationBox,
-                pendingDefaultDuration
-        );
+        int offsetX = read(offsetXBox, oldOffsetX, 0, 1000);
+        int offsetY = read(offsetYBox, oldOffsetY, 0, 1000);
+        int maxWidth = read(maxWidthBox, oldMaxWidth, 120, 600);
+        int maxHints = read(maxHintsBox, oldMaxHints, 1, 10);
+        int fadeIn = read(fadeInBox, oldFadeIn, 1, 100);
+        int fadeOut = read(fadeOutBox, oldFadeOut, 1, 100);
 
         TTClientConfig.ENABLE.set(pendingEnable);
-        TTClientConfig.MAX_HINTS.set(pendingMaxHints);
+        TTClientConfig.OFFSET_X.set(offsetX);
+        TTClientConfig.OFFSET_Y.set(offsetY);
+        TTClientConfig.MAX_WIDTH.set(maxWidth);
+        TTClientConfig.MAX_HINTS.set(maxHints);
+        TTClientConfig.FADE_IN.set(fadeIn);
+        TTClientConfig.FADE_OUT.set(fadeOut);
         TTClientConfig.SPEC.save();
 
-        TTSettings settings =
-                TTConfigManager.readGlobalSettings();
-
+        TTSettings settings = TTConfigManager.readGlobalSettings();
         settings.debug = pendingDebug;
-        settings.checkInterval = pendingCheckInterval;
-        settings.maxActiveHints = pendingMaxHints;
-        settings.defaultDuration = pendingDefaultDuration;
-
+        settings.checkInterval = read(checkIntervalBox, settings.checkInterval, 1, 72000);
+        settings.maxActiveHints = maxHints;
+        settings.defaultDuration = read(defaultDurationBox, settings.defaultDuration, -1, 72000);
         TTConfigManager.saveGlobalSettings(settings);
 
-        onClose();
+        changed = false;
+        Minecraft.getInstance().setScreen(parent);
     }
 
-    /* ------------------------------------------------------------
-     * Rendering
-     * ------------------------------------------------------------ */
-
-    @Override
-    public void render(
-            GuiGraphics graphics,
-            int mouseX,
-            int mouseY,
-            float partialTick
-    ) {
-        renderBackground(graphics);
-
-        graphics.drawCenteredString(
-                font,
-                title,
-                width / 2,
-                8,
-                0xFFFFFF
-        );
-
-        renderTabs(graphics);
-
-        /*
-         * Draw labels after background but before widgets.
-         */
-        for (LabelEntry label : pendingLabels) {
-            graphics.drawString(
-                    font,
-                    label.text(),
-                    label.x(),
-                    label.y(),
-                    0xFFFFFF
-            );
-        }
-
-        if (currentTab == Tab.COMMANDS) {
-            graphics.drawCenteredString(
-                    font,
-                    Component.translatable(
-                            "trackertips.gui.commands.description"
-                    ),
-                    width / 2,
-                    55,
-                    0xAAAAAA
-            );
-        }
-
-        if (currentTab == Tab.USAGE) {
-            int y = 65;
-
-            graphics.drawCenteredString(
-                    font,
-                    Component.translatable(
-                            "trackertips.gui.usage.title"
-                    ),
-                    width / 2,
-                    y,
-                    0xFFFFFF
-            );
-
-            graphics.drawCenteredString(
-                    font,
-                    Component.translatable(
-                            "trackertips.gui.usage.line1"
-                    ),
-                    width / 2,
-                    y + 24,
-                    0xAAAAAA
-            );
-
-            graphics.drawCenteredString(
-                    font,
-                    Component.translatable(
-                            "trackertips.gui.usage.line2"
-                    ),
-                    width / 2,
-                    y + 42,
-                    0xAAAAAA
-            );
-
-            graphics.drawCenteredString(
-                    font,
-                    Component.translatable(
-                            "trackertips.gui.usage.line3"
-                    ),
-                    width / 2,
-                    y + 60,
-                    0xAAAAAA
-            );
-        }
-
-        super.render(
-                graphics,
-                mouseX,
-                mouseY,
-                partialTick
-        );
+    public void refresh() {
+        if (saveButton == null || quitButton == null) return;
+        saveButton.active = changed;
+        saveButton.setMessage(getSaveLabel());
+        quitButton.setMessage(getQuitLabel());
     }
 
-    @Override
-    public void onClose() {
-        if (minecraft != null) {
-            minecraft.setScreen(parent);
-        } else {
-            super.onClose();
-        }
+    private Component getQuitLabel() {
+        return changed
+                ? Component.translatable("trackertips.gui.quit.unsaved")
+                : CANCEL_LABEL;
+    }
+
+    private Component getSaveLabel() {
+        return changed
+                ? Component.translatable("trackertips.gui.save")
+                : Component.translatable("trackertips.gui.saved");
+    }
+
+    public Minecraft getMinecraft() {
+        return Objects.requireNonNull(minecraft);
+    }
+
+    public int getHeaderHeight() {
+        return layout.getHeaderHeight();
+    }
+
+    public int getFooterHeight() {
+        return layout.getFooterHeight();
     }
 
     @Override

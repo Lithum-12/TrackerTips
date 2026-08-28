@@ -91,7 +91,7 @@ public class HintEngine {
         String titleJson = def.title() != null ? def.title().toString() : "";
         TTNetwork.sendToPlayer(player, new ShowHintPacket(
                 def.id(), def.text().toString(), titleJson, def.icon(), duration,
-                def.priority(), def.accentColor(), def.sound()));
+                def.priority(), def.accentColor(), def.sound(), def.theme()));
     }
 
     public static void forceShow(ServerPlayer player, ResourceLocation id) {

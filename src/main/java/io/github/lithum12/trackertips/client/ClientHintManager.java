@@ -53,7 +53,7 @@ public class ClientHintManager {
         }
 
         ACTIVE.add(new ActiveHint(packet.id(), title, text, icon,
-                packet.duration(), packet.priority(), packet.accent()));
+                packet.duration(), packet.priority(), packet.accent(), packet.theme()));
         ACTIVE.sort(Comparator.comparingInt(ActiveHint::priority).reversed());
 
         if (!packet.sound().isEmpty()) {
@@ -85,11 +85,12 @@ public class ClientHintManager {
         private final ItemStack icon;
         private final int priority;
         private final int accent;
+        private final String theme;
         private int duration;
         public int age = 0; // 改为 public 方便外部防轰炸判断
 
         public ActiveHint(ResourceLocation id, Component title, Component text, ItemStack icon,
-                          int duration, int priority, int accent) {
+                          int duration, int priority, int accent, String theme) {
             this.id = id;
             this.title = title;
             this.text = text;
@@ -97,6 +98,7 @@ public class ClientHintManager {
             this.duration = duration;
             this.priority = priority;
             this.accent = accent;
+            this.theme = theme;
         }
 
         public boolean tick() {
@@ -124,5 +126,6 @@ public class ClientHintManager {
         public ItemStack icon() { return icon; }
         public int priority() { return priority; }
         public int accent() { return accent; }
+        public String theme() { return theme; }
     }
 }

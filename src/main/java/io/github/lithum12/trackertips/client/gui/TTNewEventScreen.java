@@ -59,6 +59,7 @@ public final class TTNewEventScreen extends Screen {
                 json.addProperty("duration", 240);
                 json.addProperty("require", "any");
                 json.addProperty("accent", "F2C14E");
+                json.addProperty("theme", "trackertips:default");
                 json.addProperty("text", "");
                 var triggers = new com.google.gson.JsonArray();
                 JsonObject trigger = new JsonObject();
