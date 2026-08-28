@@ -33,6 +33,30 @@ public class TTConfigManager {
         return HINTS.values();
     }
 
+
+    /** Client GUI helper: reads the global settings file without requiring a running server. */
+    public static TTSettings readGlobalSettings() {
+        try {
+            ensureGlobalDefaults();
+            Path cfg = globalFolder().resolve("global_config.json");
+            return GSON.fromJson(Files.readString(cfg, StandardCharsets.UTF_8), TTSettings.class);
+        } catch (Exception e) {
+            TrackerTips.LOGGER.error("Failed to read global TrackerTips settings", e);
+            return new TTSettings();
+        }
+    }
+
+    /** Client GUI helper: writes the global settings file. */
+    public static void saveGlobalSettings(TTSettings value) {
+        try {
+            Files.createDirectories(globalFolder());
+            Files.writeString(globalFolder().resolve("global_config.json"),
+                    GSON.toJson(value), StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            TrackerTips.LOGGER.error("Failed to save global TrackerTips settings", e);
+        }
+    }
+
     public static Path globalFolder() {
         return FMLPaths.CONFIGDIR.get().resolve(TrackerTips.MODID);
     }

@@ -17,13 +17,22 @@ public class HealthBelowTrigger implements IHintTrigger {
         return new HealthBelowTrigger(GsonHelper.getAsFloat(json, "health", 6.0f));
     }
 
+    public boolean isCurrentlyBelow(ServerPlayer player) {
+        return player.getHealth() <= threshold && player.isAlive();
+    }
+
+    @Override
+    public boolean currentState(ServerPlayer player) {
+        return isCurrentlyBelow(player);
+    }
+
     @Override
     public boolean test(ServerPlayer player) {
-        boolean isDangerNow = player.getHealth() <= threshold && player.isAlive();
+        boolean isDangerNow = isCurrentlyBelow(player);
         Boolean wasDanger = wasInDanger.get(player.getUUID());
         if (wasDanger == null) { wasInDanger.put(player.getUUID(), isDangerNow); return false; }
         wasInDanger.put(player.getUUID(), isDangerNow);
-        // 边缘触发：之前安全，现在危险
+        // Edge trigger: safe before, dangerous now
         return isDangerNow && !wasDanger;
     }
 }

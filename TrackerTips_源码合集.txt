@@ -1,0 +1,3681 @@
+TrackerTips 项目源码合集
+================================================================================
+共 53 个文件
+================================================================================
+
+================================================================================
+文件路径: build.gradle
+================================================================================
+buildscript {
+    repositories {
+        maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.spongepowered:mixingradle:0.7-SNAPSHOT'
+
+    }
+
+}
+
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'net.minecraftforge.gradle' version '[6.0.16,6.2)'
+}
+
+group = mod_group_id
+version = mod_version
+
+base {
+    archivesName = mod_id
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(17)
+}
+
+minecraft {
+    mappings channel: mapping_channel, version: mapping_version
+
+    copyIdeResources = true
+
+    runs {
+        configureEach {
+            workingDirectory project.file('run')
+
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        client {
+            property 'forge.enabledGameTestNamespaces', mod_id
+        }
+
+        server {
+            property 'forge.enabledGameTestNamespaces', mod_id
+            args '--nogui'
+        }
+
+        gameTestServer {
+            property 'forge.enabledGameTestNamespaces', mod_id
+        }
+
+        data {
+            workingDirectory project.file('run-data')
+            args '--mod', mod_id, '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
+        }
+    }
+}
+
+repositories {
+    maven { url = 'https://maven.shedaniel.me/' }
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+
+    // Forge 1.20.1 / Cloth Config v11 API.
+    implementation fg.deobf('me.shedaniel.cloth:cloth-config-forge:11.1.136')
+}
+processResources {
+    var replaceProperties = [
+            minecraft_version: minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            forge_version: forge_version,
+            forge_version_range: forge_version_range,
+            loader_version_range: loader_version_range,
+            mod_id: mod_id,
+            mod_name: mod_name,
+            mod_license: mod_license,
+            mod_version: mod_version,
+            mod_authors: mod_authors,
+            mod_description: mod_description
+    ]
+
+    inputs.properties replaceProperties
+
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties
+    }
+}
+
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+jar {
+    manifest {
+        attributes([
+                'Specification-Title'     : mod_id,
+                'Specification-Vendor'    : mod_authors,
+                'Specification-Version'   : '1',
+                'Implementation-Title'    : project.name,
+                'Implementation-Version'  : project.jar.archiveVersion,
+                'Implementation-Vendor'   : mod_authors,
+        ])
+    }
+}
+
+tasks.named('jar', Jar).configure {
+    finalizedBy 'reobfJar'
+}
+
+
+================================================================================
+文件路径: gradle.properties
+================================================================================
+org.gradle.jvmargs=-Xmx3G
+org.gradle.daemon=false
+
+minecraft_version=1.20.1
+minecraft_version_range=[1.20,1.20.5)
+
+forge_version=47.3.10
+forge_version_range=[47,)
+loader_version_range=[47,)
+mapping_channel=official
+mapping_version=1.20.1
+
+mod_id=trackertips
+mod_name=TrackerTips
+mod_license=GNU LGPL 3.0
+mod_version=8.8
+mod_group_id=io.github.lithum12
+mod_authors=Lithum-12
+mod_description=Event-driven gameplay hints for Minecraft.
+
+
+================================================================================
+文件路径: settings.gradle
+================================================================================
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        maven {
+            name = 'MinecraftForge'
+            url = 'https://maven.minecraftforge.net/'
+        }
+    }
+}
+
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.7.0'
+}
+
+rootProject.name = 'TrackerTips'
+
+
+================================================================================
+文件路径: .gitignore
+================================================================================
+# MacOS DS_Store files
+.DS_Store
+
+# Gradle cache folder
+.gradle
+
+# Gradle build folder
+build
+
+# IntelliJ
+out/
+.idea
+*.iml
+# mpeltonen/sbt-idea plugin
+.idea_modules/
+
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
+
+# Common working directory
+run
+
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/TrackerTips.java
+================================================================================
+package io.github.lithum12.trackertips;
+
+import com.mojang.logging.LogUtils;
+import io.github.lithum12.trackertips.config.TTClientConfig;
+import io.github.lithum12.trackertips.network.TTNetwork;
+import io.github.lithum12.trackertips.trigger.Triggers;
+import net.minecraftforge.fml.ModLoadingContext;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.config.ModConfig;
+import org.slf4j.Logger;
+
+@Mod(TrackerTips.MODID)
+public class TrackerTips {
+
+    public static final String MODID = "trackertips";
+    public static final Logger LOGGER = LogUtils.getLogger();
+
+    public TrackerTips() {
+        TTNetwork.register();
+        Triggers.init();
+        ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, TTClientConfig.SPEC);
+    }
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/client/ClientHintManager.java
+================================================================================
+package io.github.lithum12.trackertips.client;
+
+import io.github.lithum12.trackertips.network.ShowHintPacket;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraftforge.registries.ForgeRegistries;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+
+@OnlyIn(Dist.CLIENT)
+public class ClientHintManager {
+    public static final List<ActiveHint> ACTIVE = new ArrayList<>();
+    private static boolean visible = true;
+
+    public static boolean isVisible() { return visible; }
+    public static boolean toggleVisible() {
+        visible = !visible;
+        return visible;
+    }
+
+    public static void show(ShowHintPacket packet) {
+        for (ActiveHint hint : ACTIVE) {
+            if (hint.id().equals(packet.id())) {
+                // 🚨【致命修复 2】防包轰炸机制：防止服务端每 Tick 疯狂发包导致 age 被无限重置为 0，从而永远不消失
+                if (hint.duration <= 0) return; // 永久提示已存在，无需刷新
+                if (hint.age < 20) return;     // 刚显示不到1秒(20tick)，忽略重复包
+
+                hint.refresh(packet.duration());
+                return;
+            }
+        }
+
+        MutableComponent text = Component.Serializer.fromJson(packet.textJson());
+        if (text == null) text = Component.literal(packet.textJson());
+        Component title = null;
+        if (!packet.titleJson().isEmpty()) {
+            title = Component.Serializer.fromJson(packet.titleJson());
+        }
+        ItemStack icon = ItemStack.EMPTY;
+        if (!packet.icon().isEmpty()) {
+            Item item = ForgeRegistries.ITEMS.getValue(new ResourceLocation(packet.icon()));
+            if (item != null) icon = new ItemStack(item);
+        }
+
+        ACTIVE.add(new ActiveHint(packet.id(), title, text, icon,
+                packet.duration(), packet.priority(), packet.accent()));
+        ACTIVE.sort(Comparator.comparingInt(ActiveHint::priority).reversed());
+
+        if (!packet.sound().isEmpty()) {
+            SoundEvent sound = BuiltInRegistries.SOUND_EVENT.get(new ResourceLocation(packet.sound()));
+            if (sound != null && Minecraft.getInstance().player != null) {
+                Minecraft.getInstance().player.playSound(sound, 1.0F, 1.0F);
+            }
+        }
+    }
+
+    public static void hide(ResourceLocation id) {
+        ACTIVE.removeIf(h -> h.id().equals(id));
+    }
+
+    public static void dismissCurrent() {
+        if (!ACTIVE.isEmpty()) {
+            ACTIVE.remove(0);
+        }
+    }
+
+    public static void tick() {
+        ACTIVE.removeIf(ActiveHint::tick);
+    }
+
+    public static class ActiveHint {
+        private final ResourceLocation id;
+        private final Component title;
+        private final Component text;
+        private final ItemStack icon;
+        private final int priority;
+        private final int accent;
+        private int duration;
+        public int age = 0; // 改为 public 方便外部防轰炸判断
+
+        public ActiveHint(ResourceLocation id, Component title, Component text, ItemStack icon,
+                          int duration, int priority, int accent) {
+            this.id = id;
+            this.title = title;
+            this.text = text;
+            this.icon = icon;
+            this.duration = duration;
+            this.priority = priority;
+            this.accent = accent;
+        }
+
+        public boolean tick() {
+            if (duration <= 0) return false;
+            age++;
+            return age >= duration;
+        }
+
+        public void refresh(int newDuration) {
+            age = 0;
+            duration = newDuration;
+        }
+
+        public float alpha(int fadeIn, int fadeOut) {
+            if (fadeIn > 0 && age < fadeIn) return age / (float) fadeIn;
+            if (duration <= 0) return 1.0F;
+            int remaining = duration - age;
+            if (fadeOut > 0 && remaining < fadeOut) return Math.max(0, remaining / (float) fadeOut);
+            return 1.0F;
+        }
+
+        public ResourceLocation id() { return id; }
+        public Component title() { return title; }
+        public Component text() { return text; }
+        public ItemStack icon() { return icon; }
+        public int priority() { return priority; }
+        public int accent() { return accent; }
+    }
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/client/HintRenderer.java
+================================================================================
+package io.github.lithum12.trackertips.client;
+
+import com.mojang.blaze3d.systems.RenderSystem;
+import io.github.lithum12.trackertips.config.TTClientConfig;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.util.Mth;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
+
+import java.util.List;
+
+@OnlyIn(Dist.CLIENT)
+public class HintRenderer {
+    private static final int PADDING = 8;
+
+    public static void render(GuiGraphics guiGraphics, int screenWidth, int screenHeight) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || !TTClientConfig.ENABLE.get()) return;
+        if (!ClientHintManager.isVisible()) return;
+        if (ClientHintManager.ACTIVE.isEmpty()) return;
+
+        Font font = minecraft.font;
+        int lineHeight = font.lineHeight + 2;
+        int x = TTClientConfig.OFFSET_X.get();
+        int bottom = screenHeight - TTClientConfig.OFFSET_Y.get();
+        int configuredMaxWidth = TTClientConfig.MAX_WIDTH.get();
+        int safeMaxWidth = Math.min(configuredMaxWidth, (screenWidth / 2) - 100);
+        int maxWidth = Math.max(120, safeMaxWidth);
+        int maxHints = TTClientConfig.MAX_HINTS.get();
+        int drawn = 0;
+
+        // 🚨【致命修复】必须在整个渲染循环的最外层开启 Blend！
+        // 否则 GuiGraphics.fill 里的 Alpha 通道会失效，导致背景画不出来或者颜色错乱。
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+
+        for (ClientHintManager.ActiveHint hint : ClientHintManager.ACTIVE) {
+            if (drawn >= maxHints) break;
+
+            int iconOffset = hint.icon().isEmpty() ? 0 : 20;
+            int availableWidth = maxWidth - 12 - iconOffset;
+            List<FormattedCharSequence> titleLines = hint.title() != null ? font.split(hint.title(), availableWidth) : List.of();
+            List<FormattedCharSequence> textLines = font.split(hint.text(), availableWidth);
+            int textHeight = titleLines.size() * lineHeight + (titleLines.isEmpty() ? 0 : 4) + textLines.size() * lineHeight;
+            int contentHeight = Math.max(textHeight, hint.icon().isEmpty() ? 0 : 16);
+            int height = contentHeight + PADDING * 2;
+            int y = bottom - height;
+
+            float alphaProgress = hint.alpha(TTClientConfig.FADE_IN.get(), TTClientConfig.FADE_OUT.get());
+            int a = Math.max(24, (int) (alphaProgress * 255));
+
+            // 2. 绘制背景面板（现在 Blend 已经开启，透明度正常生效！）
+            drawPanel(guiGraphics, x, y, maxWidth, height, a, hint.accent());
+
+            int contentX = x + 8;
+            int contentY = y + PADDING;
+
+            // 3. 绘制物品图标
+            if (!hint.icon().isEmpty()) {
+                RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, alphaProgress);
+                guiGraphics.renderItem(hint.icon(), contentX, contentY);
+                RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+            }
+
+            int textX = contentX + iconOffset;
+            int currentY = contentY;
+            int textColor = withAlpha(a, 0xF5F7FA);
+
+            for (FormattedCharSequence line : titleLines) {
+                guiGraphics.drawString(font, line, textX, currentY, 0xFFFFFF, false);
+                currentY += lineHeight;
+            }
+            if (!titleLines.isEmpty()) currentY += 4;
+
+            for (FormattedCharSequence line : textLines) {
+                guiGraphics.drawString(font, line, textX, currentY, textColor, false);
+                currentY += lineHeight;
+            }
+            bottom = y - 4;
+            drawn++;
+        }
+
+        // 渲染结束，关闭 Blend 防止污染原版 UI
+        RenderSystem.disableBlend();
+    }
+
+    private static void drawPanel(GuiGraphics guiGraphics, int x, int y, int width, int height, int a, int accent) {
+        int x2 = x + width;
+        int y2 = y + height;
+        int backgroundAlpha = Mth.clamp((int) (a * 0.92F), 0, 255);
+        int background = withAlpha(backgroundAlpha, 0x14171C);
+        guiGraphics.fill(x + 1, y + 1, x2 - 1, y2 - 1, background);
+        guiGraphics.fillGradient(x + 1, y + 1, x2 - 1, y2 - 1,
+                withAlpha(Math.min(255, backgroundAlpha + 18), 0x232830), background);
+        guiGraphics.fill(x, y, x2, y + 1, withAlpha(a, 0xFFFFFF));
+        guiGraphics.fill(x, y2 - 1, x2, y2, withAlpha(Math.max(0, a - 36), 0xFFFFFF));
+        guiGraphics.fill(x, y, x + 1, y2, withAlpha(a, 0xFFFFFF));
+        guiGraphics.fill(x2 - 1, y, x2, y2, withAlpha(Math.max(0, a - 36), 0xFFFFFF));
+        guiGraphics.fill(x + 2, y + 2, x + 4, y2 - 2, withAlpha(a, accent));
+    }
+
+    private static int withAlpha(int alpha, int rgb) {
+        return (Mth.clamp(alpha, 0, 255) << 24) | (rgb & 0xFFFFFF);
+    }
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/client/TTClientEvents.java
+================================================================================
+package io.github.lithum12.trackertips.client;
+
+import io.github.lithum12.trackertips.TrackerTips;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+
+@Mod.EventBusSubscriber(modid = TrackerTips.MODID, value = Dist.CLIENT)
+public class TTClientEvents {
+
+    @SubscribeEvent
+    public static void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        ClientHintManager.tick();
+
+        // 打开任何界面（聊天框 / 菜单 / 背包）时不响应按键，防止打字误触
+        if (minecraft.player == null || minecraft.screen != null) {
+            return;
+        }
+
+        // 按 H：关闭当前正在显示的提示
+        while (TTKeyMappings.DISMISS_HINT.consumeClick()) {
+            ClientHintManager.dismissCurrent();
+        }
+
+        // 按 J：显示 / 隐藏全部提示
+        while (TTKeyMappings.TOGGLE_HINT.consumeClick()) {
+            boolean visible = ClientHintManager.toggleVisible();
+            minecraft.player.sendSystemMessage(Component.translatable(
+                    visible ? "trackertips.message.hints_on" : "trackertips.message.hints_off"));
+        }
+    }
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/client/TTClientModEvents.java
+================================================================================
+package io.github.lithum12.trackertips.client;
+
+import io.github.lithum12.trackertips.TrackerTips;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.RegisterGuiOverlaysEvent;
+import net.minecraftforge.client.gui.overlay.VanillaGuiOverlay;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+
+@Mod.EventBusSubscriber(modid = TrackerTips.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
+public class TTClientModEvents {
+
+    @SubscribeEvent
+    public static void onRegisterOverlays(RegisterGuiOverlaysEvent event) {
+        event.registerAbove(
+                VanillaGuiOverlay.CHAT_PANEL.id(),
+                "hints",
+                (gui, guiGraphics, partialTick, screenWidth, screenHeight) ->
+                        HintRenderer.render(guiGraphics, screenWidth, screenHeight)
+        );
+    }
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/client/TTKeyMappings.java
+================================================================================
+package io.github.lithum12.trackertips.client;
+
+import com.mojang.blaze3d.platform.InputConstants;
+import io.github.lithum12.trackertips.TrackerTips;
+import net.minecraft.client.KeyMapping;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+
+@Mod.EventBusSubscriber(modid = TrackerTips.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
+public class TTKeyMappings {
+
+    // 默认 H：关闭当前提示
+    public static final KeyMapping DISMISS_HINT = new KeyMapping(
+            "key.trackertips.dismiss",
+            InputConstants.KEY_H,
+            "key.categories.trackertips");
+
+    // 默认 J：显示 / 隐藏全部提示
+    public static final KeyMapping TOGGLE_HINT = new KeyMapping(
+            "key.trackertips.toggle",
+            InputConstants.KEY_J,
+            "key.categories.trackertips");
+
+    @SubscribeEvent
+    public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
+        event.register(DISMISS_HINT);
+        event.register(TOGGLE_HINT);
+    }
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/client/gui/TTClient.java
+================================================================================
+package io.github.lithum12.trackertips.client.gui;
+
+import io.github.lithum12.trackertips.client.gui.TTConfigScreen;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
+import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
+import net.minecraftforge.client.event.InputEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+import org.lwjgl.glfw.GLFW;
+
+@Mod.EventBusSubscriber(
+        modid = "trackertips",
+        bus = Mod.EventBusSubscriber.Bus.MOD
+)
+public class TTClient {
+
+    public static final KeyMapping CONFIG_KEY = new KeyMapping(
+            "key.trackertips.config",
+            GLFW.GLFW_KEY_F8,
+            "key.categories.trackertips"
+    );
+
+    @SubscribeEvent
+    public static void registerKeys(RegisterKeyMappingsEvent event) {
+        event.register(CONFIG_KEY);
+    }
+
+    @Mod.EventBusSubscriber(
+            modid = "trackertips",
+            bus = Mod.EventBusSubscriber.Bus.FORGE
+    )
+    public static class ForgeEvents {
+
+        @SubscribeEvent
+        public static void onKeyInput(InputEvent.Key event) {
+            if (CONFIG_KEY.consumeClick()) {
+                Minecraft.getInstance().setScreen(
+                        new TTConfigScreen(Minecraft.getInstance().screen)
+                );
+            }
+        }
+    }
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/client/gui/TTClothEventEditor.java
+================================================================================
+package io.github.lithum12.trackertips.client.gui;
+
+import com.google.gson.*;
+import io.github.lithum12.trackertips.TrackerTips;
+import me.shedaniel.clothconfig2.api.ConfigBuilder;
+import me.shedaniel.clothconfig2.api.ConfigCategory;
+import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+
+/** Opens one TrackerTips event JSON as a Cloth Config screen. */
+public final class TTClothEventEditor {
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+
+    private TTClothEventEditor() { }
+
+    public static Screen create(Screen parent, Path file) {
+        JsonObject json;
+        try {
+            json = JsonParser.parseString(Files.readString(file, StandardCharsets.UTF_8)).getAsJsonObject();
+        } catch (Exception e) {
+            TrackerTips.LOGGER.error("Failed to read TrackerTips event file: {}", file, e);
+            return parent;
+        }
+
+        ConfigBuilder builder = ConfigBuilder.create()
+                .setParentScreen(parent)
+                .setTitle(Component.translatable("trackertips.gui.event_editor", file.getFileName().toString()))
+                .setSavingRunnable(() -> save(file, json));
+        ConfigEntryBuilder entry = builder.entryBuilder();
+
+        ConfigCategory general = builder.getOrCreateCategory(Component.translatable("trackertips.gui.event.general"));
+        addString(entry, general, "trackertips.gui.event.id", json, "id", "trackertips:example");
+        general.addEntry(entry.startBooleanToggle(Component.translatable("trackertips.gui.event.once"), getBool(json, "once", true))
+                .setDefaultValue(true).setSaveConsumer(v -> json.addProperty("once", v)).build());
+        addInt(entry, general, "trackertips.gui.event.priority", json, "priority", 0);
+        addInt(entry, general, "trackertips.gui.event.cooldown", json, "cooldown", 0);
+        addInt(entry, general, "trackertips.gui.event.duration", json, "duration", 240);
+        addString(entry, general, "trackertips.gui.event.require", json, "require", "any");
+        addString(entry, general, "trackertips.gui.event.accent", json, "accent", "F2C14E");
+        addString(entry, general, "trackertips.gui.event.sound", json, "sound", "");
+        addString(entry, general, "trackertips.gui.event.icon", json, "icon", "");
+        addInt(entry, general, "trackertips.gui.event.max_times", json, "max_times", 0);
+
+        ConfigCategory content = builder.getOrCreateCategory(Component.translatable("trackertips.gui.event.content"));
+        addJsonString(entry, content, "trackertips.gui.event.title", json, "title", "");
+        addJsonString(entry, content, "trackertips.gui.event.text", json, "text", "[]");
+
+        ConfigCategory triggers = builder.getOrCreateCategory(Component.translatable("trackertips.gui.event.triggers"));
+        JsonArray array = json.has("triggers") && json.get("triggers").isJsonArray()
+                ? json.getAsJsonArray("triggers") : new JsonArray();
+        List<String> triggerValues = new ArrayList<>();
+        for (JsonElement element : array) triggerValues.add(GSON.toJson(element));
+        if (triggerValues.isEmpty()) triggerValues.add("{\"type\":\"trackertips:game_time\",\"mode\":\"after\",\"time\":200}");
+
+        for (int i = 0; i < triggerValues.size(); i++) {
+            final int index = i;
+            triggers.addEntry(entry.startStrField(
+                            Component.translatable("trackertips.gui.event.trigger", i + 1), triggerValues.get(i))
+                    .setDefaultValue(triggerValues.get(i))
+                    .setSaveConsumer(value -> setTrigger(json, index, value))
+                    .build());
+        }
+
+        return builder.build();
+    }
+
+    private static void addString(ConfigEntryBuilder entry, ConfigCategory category, String label,
+                                  JsonObject json, String key, String def) {
+        String value = json.has(key) ? json.get(key).getAsString() : def;
+        category.addEntry(entry.startStrField(Component.translatable(label), value)
+                .setDefaultValue(def)
+                .setSaveConsumer(v -> json.addProperty(key, v))
+                .build());
+    }
+
+    private static void addInt(ConfigEntryBuilder entry, ConfigCategory category, String label,
+                               JsonObject json, String key, int def) {
+        int value = json.has(key) ? json.get(key).getAsInt() : def;
+        category.addEntry(entry.startIntField(Component.translatable(label), value)
+                .setDefaultValue(def)
+                .setSaveConsumer(v -> json.addProperty(key, v))
+                .build());
+    }
+
+    private static void addJsonString(ConfigEntryBuilder entry, ConfigCategory category, String label,
+                                      JsonObject json, String key, String def) {
+        String value = json.has(key) ? GSON.toJson(json.get(key)) : def;
+        category.addEntry(entry.startStrField(Component.translatable(label), value)
+                .setDefaultValue(def)
+                .setSaveConsumer(v -> {
+                    try { json.add(key, JsonParser.parseString(v)); }
+                    catch (JsonParseException ignored) { }
+                }).build());
+    }
+
+    private static void setTrigger(JsonObject json, int index, String value) {
+        try {
+            JsonElement parsed = JsonParser.parseString(value);
+            JsonArray array = json.has("triggers") && json.get("triggers").isJsonArray()
+                    ? json.getAsJsonArray("triggers") : new JsonArray();
+            while (array.size() <= index) array.add(new JsonObject());
+            array.set(index, parsed);
+            json.add("triggers", array);
+        } catch (JsonParseException ignored) { }
+    }
+
+    private static boolean getBool(JsonObject json, String key, boolean def) {
+        return json.has(key) ? json.get(key).getAsBoolean() : def;
+    }
+
+    private static void save(Path file, JsonObject json) {
+        try {
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, GSON.toJson(json), StandardCharsets.UTF_8);
+            TrackerTips.LOGGER.info("Saved TrackerTips event: {}", file);
+        } catch (Exception e) {
+            TrackerTips.LOGGER.error("Failed to save TrackerTips event: {}", file, e);
+        }
+    }
+}
+
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/client/gui/TTConfigScreen.java
+================================================================================
+package io.github.lithum12.trackertips.client.gui;
+
+import io.github.lithum12.trackertips.config.TTClientConfig;
+import io.github.lithum12.trackertips.config.TTConfigManager;
+import io.github.lithum12.trackertips.config.TTSettings;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Main TrackerTips configuration screen.
+ *
+ * Vanilla 1.19.4 / Create World style top navigation.
+ */
+public class TTConfigScreen extends Screen {
+
+    private final Screen parent;
+
+    private enum Tab {
+        GENERAL,
+        EVENTS,
+        COMMANDS,
+        USAGE
+    }
+
+    private Tab currentTab = Tab.GENERAL;
+
+    // Pending values
+    private boolean pendingEnable;
+    private int pendingMaxHints;
+    private boolean pendingDebug;
+    private int pendingCheckInterval;
+    private int pendingDefaultDuration;
+
+    // Input boxes
+    private EditBox maxHintsBox;
+    private EditBox checkIntervalBox;
+    private EditBox defaultDurationBox;
+
+    public TTConfigScreen() {
+        this(null);
+    }
+
+    public TTConfigScreen(Screen parent) {
+        super(Component.translatable("trackertips.gui.title"));
+        this.parent = parent;
+
+        pendingEnable = TTClientConfig.ENABLE.get();
+        pendingMaxHints = TTClientConfig.MAX_HINTS.get();
+
+        TTSettings settings = TTConfigManager.readGlobalSettings();
+
+        pendingDebug = settings.debug;
+        pendingCheckInterval = settings.checkInterval;
+        pendingDefaultDuration = settings.defaultDuration;
+    }
+
+    @Override
+    protected void init() {
+        rebuild();
+    }
+
+    private void rebuild() {
+        clearWidgets();
+        pendingLabels.clear();
+
+        maxHintsBox = null;
+        checkIntervalBox = null;
+        defaultDurationBox = null;
+
+        buildTabs();
+
+        switch (currentTab) {
+            case GENERAL -> buildGeneral();
+            case EVENTS -> buildEvents();
+            case COMMANDS -> buildCommands();
+            case USAGE -> {
+            }
+        }
+
+        buildBottomButtons();
+    }
+
+    /* ------------------------------------------------------------
+     * Top navigation
+     * ------------------------------------------------------------ */
+
+    private void buildTabs() {
+        int left = 20;
+        int width = this.width - 40;
+        int tabWidth = width / 4;
+
+        Tab[] tabs = Tab.values();
+
+        for (int i = 0; i < tabs.length; i++) {
+            final Tab tab = tabs[i];
+
+            Button button = Button.builder(
+                    Component.empty(),
+                    b -> {
+                        if (currentTab != tab) {
+                            currentTab = tab;
+                            rebuild();
+                        }
+                    }
+            ).bounds(
+                    left + i * tabWidth,
+                    25,
+                    tabWidth - 2,
+                    24
+            ).build();
+
+            // Hide the vanilla button appearance.
+            button.setAlpha(0.0F);
+
+            addRenderableWidget(button);
+        }
+    }
+
+    private Component getTabTitle(Tab tab) {
+        return switch (tab) {
+            case GENERAL ->
+                    Component.translatable("trackertips.gui.tab.general");
+
+            case EVENTS ->
+                    Component.translatable("trackertips.gui.tab.events");
+
+            case COMMANDS ->
+                    Component.translatable("trackertips.gui.tab.commands");
+
+            case USAGE ->
+                    Component.translatable("trackertips.gui.tab.usage");
+        };
+    }
+
+    private void renderTabs(GuiGraphics graphics) {
+        int left = 20;
+        int width = this.width - 40;
+        int tabWidth = width / 4;
+
+        for (int i = 0; i < Tab.values().length; i++) {
+            Tab tab = Tab.values()[i];
+
+            int x = left + i * tabWidth;
+            int right = x + tabWidth - 2;
+
+            boolean selected = currentTab == tab;
+
+            // Base tab area.
+            if (selected) {
+                graphics.fill(
+                        x,
+                        25,
+                        right,
+                        49,
+                        0xFF3F3F3F
+                );
+
+                // Vanilla-style selected underline.
+                graphics.fill(
+                        x,
+                        47,
+                        right,
+                        49,
+                        0xFFFFFFFF
+                );
+            } else {
+                graphics.fill(
+                        x,
+                        25,
+                        right,
+                        49,
+                        0x80202020
+                );
+            }
+
+            Component title = getTabTitle(tab);
+
+            graphics.drawCenteredString(
+                    font,
+                    title,
+                    x + tabWidth / 2,
+                    32,
+                    selected ? 0xFFFFFF : 0xAAAAAA
+            );
+        }
+    }
+
+    /* ------------------------------------------------------------
+     * General
+     * ------------------------------------------------------------ */
+
+    private void buildGeneral() {
+        int labelX = this.width / 2 - 180;
+        int controlX = this.width / 2 + 25;
+        int controlWidth = 155;
+
+        int y = 78;
+        int rowHeight = 38;
+
+        // Enable
+        addRenderableWidget(
+                CycleButton.booleanBuilder(
+                                Component.translatable("trackertips.value.yes"),
+                                Component.translatable("trackertips.value.no")
+                        )
+                        .withInitialValue(pendingEnable)
+                        .create(
+                                controlX,
+                                y,
+                                controlWidth,
+                                20,
+                                Component.empty(),
+                                (button, value) -> pendingEnable = value
+                        )
+        );
+
+        drawLabelLater(
+                Component.translatable("trackertips.gui.enable"),
+                labelX,
+                y + 6
+        );
+
+        // Max hints
+        maxHintsBox = createIntegerBox(
+                controlX,
+                y + rowHeight,
+                controlWidth,
+                pendingMaxHints
+        );
+
+        drawLabelLater(
+                Component.translatable("trackertips.gui.max_hints"),
+                labelX,
+                y + rowHeight + 6
+        );
+
+        // Check interval
+        checkIntervalBox = createIntegerBox(
+                controlX,
+                y + rowHeight * 2,
+                controlWidth,
+                pendingCheckInterval
+        );
+
+        drawLabelLater(
+                Component.translatable("trackertips.gui.check_interval"),
+                labelX,
+                y + rowHeight * 2 + 6
+        );
+
+        // Debug
+        addRenderableWidget(
+                CycleButton.booleanBuilder(
+                                Component.translatable("trackertips.value.yes"),
+                                Component.translatable("trackertips.value.no")
+                        )
+                        .withInitialValue(pendingDebug)
+                        .create(
+                                controlX,
+                                y + rowHeight * 3,
+                                controlWidth,
+                                20,
+                                Component.empty(),
+                                (button, value) -> pendingDebug = value
+                        )
+        );
+
+        drawLabelLater(
+                Component.translatable("trackertips.gui.debug"),
+                labelX,
+                y + rowHeight * 3 + 6
+        );
+
+        // Default duration
+        defaultDurationBox = createIntegerBox(
+                controlX,
+                y + rowHeight * 4,
+                controlWidth,
+                pendingDefaultDuration
+        );
+
+        drawLabelLater(
+                Component.translatable("trackertips.gui.default_duration"),
+                labelX,
+                y + rowHeight * 4 + 6
+        );
+    }
+
+    private EditBox createIntegerBox(
+            int x,
+            int y,
+            int width,
+            int value
+    ) {
+        EditBox box = new EditBox(
+                font,
+                x,
+                y,
+                width,
+                20,
+                Component.empty()
+        );
+
+        box.setValue(Integer.toString(value));
+        box.setFilter(s -> s.matches("-?\\d*"));
+        box.setResponder(valueString -> {
+            // Don't immediately mutate configuration.
+            // The actual value is validated when saving.
+        });
+
+        addRenderableWidget(box);
+
+        return box;
+    }
+
+    /*
+     * Labels are rendered manually in render().
+     * This avoids the duplicated Yes/No / label problem.
+     */
+    private final List<LabelEntry> pendingLabels = new ArrayList<>();
+
+    private void drawLabelLater(Component text, int x, int y) {
+        pendingLabels.add(new LabelEntry(text, x, y));
+    }
+
+    private record LabelEntry(Component text, int x, int y) {
+    }
+
+    /* ------------------------------------------------------------
+     * Events
+     * ------------------------------------------------------------ */
+
+    private void buildEvents() {
+        Path folder = TTConfigManager.globalFolder().resolve("hints");
+
+        List<Path> files = new ArrayList<>();
+
+        try {
+            if (Files.isDirectory(folder)) {
+                try (var stream = Files.list(folder)) {
+                    stream.filter(
+                                    p -> p.getFileName()
+                                            .toString()
+                                            .endsWith(".json")
+                            )
+                            .sorted()
+                            .forEach(files::add);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        int x = this.width / 2 - 190;
+        int y = 64;
+
+        int rowHeight = 28;
+        int maxRows = Math.max(
+                1,
+                (this.height - 150) / rowHeight
+        );
+
+        if (files.isEmpty()) {
+            addRenderableWidget(
+                    Button.builder(
+                                    Component.translatable(
+                                            "trackertips.gui.add_event"
+                                    ),
+                                    b -> Minecraft.getInstance().setScreen(
+                                            TTNewEventScreen.create(this)
+                                    )
+                            )
+                            .bounds(
+                                    this.width / 2 - 100,
+                                    85,
+                                    200,
+                                    20
+                            )
+                            .build()
+            );
+        }
+
+        for (int i = 0; i < Math.min(files.size(), maxRows); i++) {
+            Path file = files.get(i);
+
+            int rowY = y + i * rowHeight;
+
+            addRenderableWidget(
+                    Button.builder(
+                                    Component.literal(
+                                            file.getFileName().toString()
+                                    ),
+                                    b -> openEvent(file)
+                            )
+                            .bounds(x, rowY, 220, 20)
+                            .build()
+            );
+
+            addRenderableWidget(
+                    Button.builder(
+                                    Component.translatable(
+                                            "trackertips.gui.edit"
+                                    ),
+                                    b -> openEvent(file)
+                            )
+                            .bounds(x + 225, rowY, 70, 20)
+                            .build()
+            );
+
+            addRenderableWidget(
+                    Button.builder(
+                                    Component.translatable(
+                                            "trackertips.gui.delete"
+                                    ),
+                                    b -> confirmDelete(file)
+                            )
+                            .bounds(x + 300, rowY, 70, 20)
+                            .build()
+            );
+        }
+
+        if (!files.isEmpty()) {
+            int actionsY = Math.min(
+                    y + maxRows * rowHeight + 5,
+                    this.height - 62
+            );
+
+            addRenderableWidget(
+                    Button.builder(
+                                    Component.translatable(
+                                            "trackertips.gui.add_event"
+                                    ),
+                                    b -> Minecraft.getInstance().setScreen(
+                                            TTNewEventScreen.create(this)
+                                    )
+                            )
+                            .bounds(
+                                    this.width / 2 - 105,
+                                    actionsY,
+                                    100,
+                                    20
+                            )
+                            .build()
+            );
+
+            addRenderableWidget(
+                    Button.builder(
+                                    Component.translatable(
+                                            "trackertips.gui.refresh"
+                                    ),
+                                    b -> rebuild()
+                            )
+                            .bounds(
+                                    this.width / 2 + 5,
+                                    actionsY,
+                                    100,
+                                    20
+                            )
+                            .build()
+            );
+        }
+    }
+
+    /* ------------------------------------------------------------
+     * Commands
+     * ------------------------------------------------------------ */
+
+    private void buildCommands() {
+        int y = 78;
+
+        addRenderableWidget(
+                Button.builder(
+                                Component.translatable(
+                                        "trackertips.gui.reload_command"
+                                ),
+                                b -> {
+                                    if (Minecraft.getInstance().player != null) {
+                                        Minecraft.getInstance()
+                                                .player
+                                                .connection
+                                                .sendCommand(
+                                                        "trackertips reload"
+                                                );
+                                    }
+                                }
+                        )
+                        .bounds(
+                                this.width / 2 - 90,
+                                y,
+                                180,
+                                20
+                        )
+                        .build()
+        );
+    }
+
+    /* ------------------------------------------------------------
+     * Bottom buttons
+     * ------------------------------------------------------------ */
+
+    private void buildBottomButtons() {
+        int bottom = this.height - 32;
+
+        addRenderableWidget(
+                Button.builder(
+                                Component.translatable("gui.cancel"),
+                                b -> onClose()
+                        )
+                        .bounds(
+                                this.width / 2 - 155,
+                                bottom,
+                                100,
+                                20
+                        )
+                        .build()
+        );
+
+        addRenderableWidget(
+                Button.builder(
+                                Component.translatable("gui.done"),
+                                b -> saveAndClose()
+                        )
+                        .bounds(
+                                this.width / 2 - 50,
+                                bottom,
+                                100,
+                                20
+                        )
+                        .build()
+        );
+
+        addRenderableWidget(
+                Button.builder(
+                                Component.translatable(
+                                        "trackertips.gui.restore_defaults"
+                                ),
+                                b -> restoreDefaults()
+                        )
+                        .bounds(
+                                this.width / 2 + 55,
+                                bottom,
+                                100,
+                                20
+                        )
+                        .build()
+        );
+    }
+
+    /* ------------------------------------------------------------
+     * Event operations
+     * ------------------------------------------------------------ */
+
+    private void openEvent(Path file) {
+        Minecraft.getInstance().setScreen(
+                TTClothEventEditor.create(this, file)
+        );
+    }
+
+    private void confirmDelete(Path file) {
+        Minecraft.getInstance().setScreen(
+                TTConfirmScreen.create(
+                        this,
+                        Component.translatable(
+                                "trackertips.gui.delete_confirm",
+                                file.getFileName()
+                        ),
+                        () -> {
+                            try {
+                                Files.deleteIfExists(file);
+                            } catch (Exception ignored) {
+                            }
+
+                            rebuild();
+                        }
+                )
+        );
+    }
+
+    /* ------------------------------------------------------------
+     * Defaults / saving
+     * ------------------------------------------------------------ */
+
+    private void restoreDefaults() {
+        pendingEnable = true;
+        pendingMaxHints = 3;
+        pendingDebug = false;
+        pendingCheckInterval = 20;
+        pendingDefaultDuration = 240;
+
+        rebuild();
+    }
+
+    private int readInteger(EditBox box, int fallback) {
+        if (box == null) {
+            return fallback;
+        }
+
+        try {
+            return Integer.parseInt(box.getValue().trim());
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
+    private void saveAndClose() {
+        pendingMaxHints = Math.max(
+                1,
+                readInteger(maxHintsBox, pendingMaxHints)
+        );
+
+        pendingCheckInterval = Math.max(
+                1,
+                readInteger(checkIntervalBox, pendingCheckInterval)
+        );
+
+        pendingDefaultDuration = readInteger(
+                defaultDurationBox,
+                pendingDefaultDuration
+        );
+
+        TTClientConfig.ENABLE.set(pendingEnable);
+        TTClientConfig.MAX_HINTS.set(pendingMaxHints);
+        TTClientConfig.SPEC.save();
+
+        TTSettings settings =
+                TTConfigManager.readGlobalSettings();
+
+        settings.debug = pendingDebug;
+        settings.checkInterval = pendingCheckInterval;
+        settings.maxActiveHints = pendingMaxHints;
+        settings.defaultDuration = pendingDefaultDuration;
+
+        TTConfigManager.saveGlobalSettings(settings);
+
+        onClose();
+    }
+
+    /* ------------------------------------------------------------
+     * Rendering
+     * ------------------------------------------------------------ */
+
+    @Override
+    public void render(
+            GuiGraphics graphics,
+            int mouseX,
+            int mouseY,
+            float partialTick
+    ) {
+        renderBackground(graphics);
+
+        graphics.drawCenteredString(
+                font,
+                title,
+                width / 2,
+                8,
+                0xFFFFFF
+        );
+
+        renderTabs(graphics);
+
+        /*
+         * Draw labels after background but before widgets.
+         */
+        for (LabelEntry label : pendingLabels) {
+            graphics.drawString(
+                    font,
+                    label.text(),
+                    label.x(),
+                    label.y(),
+                    0xFFFFFF
+            );
+        }
+
+        if (currentTab == Tab.COMMANDS) {
+            graphics.drawCenteredString(
+                    font,
+                    Component.translatable(
+                            "trackertips.gui.commands.description"
+                    ),
+                    width / 2,
+                    55,
+                    0xAAAAAA
+            );
+        }
+
+        if (currentTab == Tab.USAGE) {
+            int y = 65;
+
+            graphics.drawCenteredString(
+                    font,
+                    Component.translatable(
+                            "trackertips.gui.usage.title"
+                    ),
+                    width / 2,
+                    y,
+                    0xFFFFFF
+            );
+
+            graphics.drawCenteredString(
+                    font,
+                    Component.translatable(
+                            "trackertips.gui.usage.line1"
+                    ),
+                    width / 2,
+                    y + 24,
+                    0xAAAAAA
+            );
+
+            graphics.drawCenteredString(
+                    font,
+                    Component.translatable(
+                            "trackertips.gui.usage.line2"
+                    ),
+                    width / 2,
+                    y + 42,
+                    0xAAAAAA
+            );
+
+            graphics.drawCenteredString(
+                    font,
+                    Component.translatable(
+                            "trackertips.gui.usage.line3"
+                    ),
+                    width / 2,
+                    y + 60,
+                    0xAAAAAA
+            );
+        }
+
+        super.render(
+                graphics,
+                mouseX,
+                mouseY,
+                partialTick
+        );
+    }
+
+    @Override
+    public void onClose() {
+        if (minecraft != null) {
+            minecraft.setScreen(parent);
+        } else {
+            super.onClose();
+        }
+    }
+
+    @Override
+    public boolean isPauseScreen() {
+        return false;
+    }
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/client/gui/TTConfigScreenFactory.java
+================================================================================
+package io.github.lithum12.trackertips.client.gui;
+
+import net.minecraft.client.gui.screens.Screen;
+
+/** Entry point for ModMenu or another config-menu integration. */
+public final class TTConfigScreenFactory {
+    private TTConfigScreenFactory() { }
+
+    public static Screen create(Screen parent) {
+        return new TTConfigScreen(parent);
+    }
+}
+
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/client/gui/TTConfirmScreen.java
+================================================================================
+package io.github.lithum12.trackertips.client.gui;
+
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
+
+public final class TTConfirmScreen extends Screen {
+    private final Screen parent;
+    private final Component message;
+    private final Runnable confirmed;
+
+    private TTConfirmScreen(Screen parent, Component message, Runnable confirmed) {
+        super(Component.translatable("trackertips.gui.confirm"));
+        this.parent = parent;
+        this.message = message;
+        this.confirmed = confirmed;
+    }
+
+    public static Screen create(Screen parent, Component message, Runnable confirmed) {
+        return new TTConfirmScreen(parent, message, confirmed);
+    }
+
+    @Override protected void init() {
+        addRenderableWidget(Button.builder(Component.translatable("gui.cancel"), b -> minecraft.setScreen(parent))
+                .bounds(width / 2 - 105, height - 45, 100, 20).build());
+        addRenderableWidget(Button.builder(Component.translatable("gui.yes"), b -> {
+            confirmed.run();
+            minecraft.setScreen(parent);
+        }).bounds(width / 2 + 5, height - 45, 100, 20).build());
+    }
+
+    @Override public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        renderBackground(graphics);
+        graphics.drawCenteredString(font, message, width / 2, height / 2 - 10, 0xFFFFFF);
+        super.render(graphics, mouseX, mouseY, partialTick);
+    }
+
+    @Override public boolean isPauseScreen() { return false; }
+}
+
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/client/gui/TTNewEventScreen.java
+================================================================================
+package io.github.lithum12.trackertips.client.gui;
+
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
+import io.github.lithum12.trackertips.TrackerTips;
+import io.github.lithum12.trackertips.config.TTConfigManager;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+public final class TTNewEventScreen extends Screen {
+    private final Screen parent;
+    private EditBox nameBox;
+    private EditBox typeBox;
+
+    private TTNewEventScreen(Screen parent) {
+        super(Component.translatable("trackertips.gui.add_event"));
+        this.parent = parent;
+    }
+
+    public static Screen create(Screen parent) { return new TTNewEventScreen(parent); }
+
+    @Override
+    protected void init() {
+        nameBox = new EditBox(font, width / 2 - 100, 78, 200, 20, Component.translatable("trackertips.gui.event.name"));
+        nameBox.setValue("new_event.json");
+        addRenderableWidget(nameBox);
+
+        typeBox = new EditBox(font, width / 2 - 100, 120, 200, 20, Component.translatable("trackertips.gui.event.type"));
+        typeBox.setValue("trackertips:game_time");
+        addRenderableWidget(typeBox);
+
+        addRenderableWidget(Button.builder(Component.translatable("gui.cancel"), b ->
+                        minecraft.setScreen(parent))
+                .bounds(width / 2 - 105, height - 45, 100, 20).build());
+        addRenderableWidget(Button.builder(Component.translatable("trackertips.gui.create"), b -> createFile())
+                .bounds(width / 2 + 5, height - 45, 100, 20).build());
+    }
+
+    private void createFile() {
+        String name = nameBox.getValue().trim();
+        if (name.isEmpty()) return;
+        if (!name.endsWith(".json")) name += ".json";
+        Path file = TTConfigManager.globalFolder().resolve("hints").resolve(name);
+        try {
+            Files.createDirectories(file.getParent());
+            if (!Files.exists(file)) {
+                JsonObject json = new JsonObject();
+                json.addProperty("id", TrackerTips.MODID + ":" + name.substring(0, name.length() - 5));
+                json.addProperty("once", true);
+                json.addProperty("priority", 0);
+                json.addProperty("cooldown", 0);
+                json.addProperty("duration", 240);
+                json.addProperty("require", "any");
+                json.addProperty("accent", "F2C14E");
+                json.addProperty("text", "");
+                var triggers = new com.google.gson.JsonArray();
+                JsonObject trigger = new JsonObject();
+                trigger.addProperty("type", typeBox.getValue().trim());
+                triggers.add(trigger);
+                json.add("triggers", triggers);
+                Files.writeString(file, new GsonBuilder().setPrettyPrinting().create().toJson(json), StandardCharsets.UTF_8);
+            }
+            minecraft.setScreen(TTClothEventEditor.create(parent, file));
+        } catch (Exception e) {
+            TrackerTips.LOGGER.error("Failed to create TrackerTips event: {}", file, e);
+        }
+    }
+
+    @Override
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        renderBackground(graphics);
+        graphics.drawCenteredString(font, title, width / 2, 35, 0xFFFFFF);
+        graphics.drawString(font, Component.translatable("trackertips.gui.event.name"), width / 2 - 100, 64, 0xFFFFFF);
+        graphics.drawString(font, Component.translatable("trackertips.gui.event.type"), width / 2 - 100, 106, 0xFFFFFF);
+        super.render(graphics, mouseX, mouseY, partialTick);
+    }
+
+    @Override public boolean isPauseScreen() { return false; }
+}
+
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/command/TTCommands.java
+================================================================================
+package io.github.lithum12.trackertips.command;
+
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
+import io.github.lithum12.trackertips.config.TTConfigManager;
+import io.github.lithum12.trackertips.engine.HintEngine;
+import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.commands.arguments.ResourceLocationArgument;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+
+public class TTCommands {
+
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
+        dispatcher.register(Commands.literal("trackertips")
+                // /trackertips reload
+                .then(Commands.literal("reload")
+                        .requires(source -> source.hasPermission(2)) // 需要 OP 权限
+                        .executes(TTCommands::executeReload))
+                // /trackertips test <id>
+                .then(Commands.literal("test")
+                        .requires(source -> source.hasPermission(2))
+                        .then(Commands.argument("id", ResourceLocationArgument.id())
+                                .suggests(suggestIds())
+                                .executes(TTCommands::executeTest)))
+        );
+    }
+
+    // 提供 ID 自动补全建议
+    private static SuggestionProvider<CommandSourceStack> suggestIds() {
+        return (context, builder) -> SharedSuggestionProvider.suggest(
+                TTConfigManager.hints().stream().map(h -> h.id().toString()),
+                builder
+        );
+    }
+
+    private static int executeReload(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        TTConfigManager.reload(source.getServer());
+        source.sendSuccess(() -> Component.translatable("trackertips.command.reload.success", TTConfigManager.hints().size())
+                .withStyle(ChatFormatting.GREEN), false);
+        return 1;
+    }
+
+    private static int executeTest(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
+
+        if (player == null) {
+            source.sendFailure(Component.translatable("trackertips.command.test.player_only").withStyle(ChatFormatting.RED));
+            return 0;
+        }
+
+        ResourceLocation id = ResourceLocationArgument.getId(context, "id");
+        HintEngine.forceShow(player, id);
+        return 1;
+    }
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/config/HintDefinition.java
+================================================================================
+package io.github.lithum12.trackertips.config;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import io.github.lithum12.trackertips.trigger.IHintTrigger;
+import io.github.lithum12.trackertips.trigger.IEventHintTrigger;
+import io.github.lithum12.trackertips.trigger.TriggerEvent;
+import io.github.lithum12.trackertips.trigger.Triggers;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.GsonHelper;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class HintDefinition {
+
+    private final ResourceLocation id;
+    private final boolean once;
+    private final int priority;
+    private final int cooldown;
+    private final int duration;
+    private final boolean requireAll;
+    private final int accentColor;
+    private final String sound;
+    private final JsonElement text;
+    private final List<IHintTrigger> triggers;
+    private final JsonElement title;
+    private final String icon;
+    private final int maxTimes;
+
+    public HintDefinition(ResourceLocation id, boolean once, int priority, int cooldown, int duration,
+                          boolean requireAll, int accentColor, String sound, JsonElement title, JsonElement text, String icon,
+                          List<IHintTrigger> triggers, int maxTimes) {
+        this.id = id;
+        this.once = once;
+        this.priority = priority;
+        this.cooldown = cooldown;
+        this.duration = duration;
+        this.requireAll = requireAll;
+        this.accentColor = accentColor;
+        this.sound = sound;
+        this.text = text;
+        this.title = title;
+        this.icon = icon;
+        this.triggers = triggers;
+        this.maxTimes = maxTimes;
+    }
+
+    public static HintDefinition fromJson(JsonObject json) {
+        ResourceLocation id = new ResourceLocation(GsonHelper.getAsString(json, "id"));
+        boolean once = GsonHelper.getAsBoolean(json, "once", true);
+        int priority = GsonHelper.getAsInt(json, "priority", 0);
+        int cooldown = GsonHelper.getAsInt(json, "cooldown", 0);
+        int duration = GsonHelper.getAsInt(json, "duration", 240); // Defaults to a 12-second duration; use "duration": -1 for a persistent hint
+        boolean requireAll = GsonHelper.getAsString(json, "require", "any").equalsIgnoreCase("all");
+        int accent = (int) Long.parseLong(GsonHelper.getAsString(json, "accent", "F2C14E"), 16);
+        String sound = GsonHelper.getAsString(json, "sound", "");
+        JsonElement title = json.has("title") ? json.get("title") : null;
+        JsonElement text = json.get("text");
+        String icon = GsonHelper.getAsString(json, "icon", "");
+
+        // 【修改点 1】解析最大触发次数，0 表示无限次
+        int maxTimes = GsonHelper.getAsInt(json, "max_times", 0);
+        // Compatibility: "once": true without max_times is treated as a maximum of one trigger
+        if (once && maxTimes <= 0) {
+            maxTimes = 1;
+        }
+
+        List<IHintTrigger> triggers = new ArrayList<>();
+        JsonArray array = json.has("triggers") ? json.getAsJsonArray("triggers") : new JsonArray();
+        for (JsonElement element : array) {
+            JsonObject triggerJson = element.getAsJsonObject();
+            ResourceLocation type = new ResourceLocation(GsonHelper.getAsString(triggerJson, "type"));
+            triggers.add(Triggers.create(type, triggerJson));
+        }
+
+        // 【修改点 2】把 maxTimes 传进构造器（第 13 个参数）
+        return new HintDefinition(id, once, priority, cooldown, duration, requireAll, accent, sound,
+                title, text, icon, triggers, maxTimes);
+    }
+
+    /** 普通轮询：事件型触发器不参与，避免把事件型条件误当成持续状态。 */
+    public boolean matches(ServerPlayer player) {
+        if (triggers.isEmpty()) return false;
+
+        boolean hasStateTrigger = false;
+        boolean hasEventTrigger = false;
+        boolean result = requireAll;
+        for (IHintTrigger trigger : triggers) {
+            if (trigger instanceof IEventHintTrigger eventTrigger && eventTrigger.isEventDriven()) {
+                hasEventTrigger = true;
+                continue;
+            }
+            hasStateTrigger = true;
+            boolean matched = trigger.test(player);
+            if (requireAll) result &= matched;
+            else result |= matched;
+        }
+
+        // all 模式只要包含事件条件，就必须等对应 Forge 事件发生。
+        if (requireAll && hasEventTrigger) return false;
+        // 纯事件触发器当然也不能靠轮询触发。
+        if (!hasStateTrigger) return false;
+        return result;
+    }
+
+    /** Forge 原生事件触发：事件型条件由 event 提供，普通状态条件仍实时检查。 */
+    public boolean matchesEvent(ServerPlayer player, TriggerEvent event) {
+        if (triggers.isEmpty()) return false;
+
+        if (requireAll) {
+            for (IHintTrigger trigger : triggers) {
+                boolean matched;
+                if (trigger instanceof IEventHintTrigger eventTrigger && eventTrigger.isEventDriven()) {
+                    matched = eventTrigger.matchesEvent(player, event);
+                } else {
+                    matched = trigger.test(player);
+                }
+                if (!matched) return false;
+            }
+            return true;
+        }
+
+        // any 模式下只有“当前事件对应的事件型 trigger”才有资格触发，
+        // 否则一次拾取物品可能把一个完全无关的 game_time hint 也触发出来。
+        for (IHintTrigger trigger : triggers) {
+            if (trigger instanceof IEventHintTrigger eventTrigger
+                    && eventTrigger.matchesEvent(player, event)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Current state for persistent state-based hints. Event-only triggers return false. */
+    public boolean currentState(ServerPlayer player) {
+        if (triggers.isEmpty()) return false;
+        boolean hasState = false;
+        boolean result = requireAll;
+        for (IHintTrigger trigger : triggers) {
+            if (trigger instanceof IEventHintTrigger eventTrigger && eventTrigger.isEventDriven()) {
+                continue;
+            }
+            hasState = true;
+            boolean matched = trigger.currentState(player);
+            if (requireAll) result &= matched;
+            else result |= matched;
+        }
+        return hasState && result;
+    }
+
+    public ResourceLocation id() { return id; }
+    public boolean once() { return once; }
+    public int priority() { return priority; }
+    public int cooldown() { return cooldown; }
+    public int duration() { return duration; }
+    public int accentColor() { return accentColor; }
+    public String sound() { return sound; }
+    public JsonElement text() { return text; }
+    public JsonElement title() { return title; }
+    public String icon() { return icon; }
+
+    // 【修改点 3】getter，HintEngine 里要用
+    public int maxTimes() { return maxTimes; }
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/config/TTClientConfig.java
+================================================================================
+package io.github.lithum12.trackertips.config;
+
+import net.minecraftforge.common.ForgeConfigSpec;
+
+public class TTClientConfig {
+
+    public static final ForgeConfigSpec SPEC;
+
+    public static final ForgeConfigSpec.BooleanValue ENABLE;
+    public static final ForgeConfigSpec.IntValue OFFSET_X;
+    public static final ForgeConfigSpec.IntValue OFFSET_Y;
+    public static final ForgeConfigSpec.IntValue MAX_WIDTH;
+    public static final ForgeConfigSpec.IntValue MAX_HINTS;
+    public static final ForgeConfigSpec.IntValue FADE_IN;
+    public static final ForgeConfigSpec.IntValue FADE_OUT;
+
+    static {
+        ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
+
+        ENABLE = builder.comment("Enable the hint overlay")
+                .translation("trackertips.config.enable")
+                .define("enable", true);
+        OFFSET_X = builder.comment("Left-bottom X offset")
+                .translation("trackertips.config.offset_x")
+                .defineInRange("offset_x", 6, 0, 1000);
+        OFFSET_Y = builder.comment("Left-bottom Y offset from bottom")
+                .translation("trackertips.config.offset_y")
+                .defineInRange("offset_y", 45, 0, 1000);
+        MAX_WIDTH = builder.comment("Max hint panel width")
+                .translation("trackertips.config.max_width")
+                .defineInRange("max_width", 260, 120, 600);
+        MAX_HINTS = builder.comment("Max hints shown at once")
+                .translation("trackertips.config.max_hints")
+                .defineInRange("max_hints", 3, 1, 10);
+        FADE_IN = builder.comment("Fade-in ticks")
+                .translation("trackertips.config.fade_in")
+                .defineInRange("fade_in", 6, 1, 100);
+        FADE_OUT = builder.comment("Fade-out ticks")
+                .translation("trackertips.config.fade_out")
+                .defineInRange("fade_out", 10, 1, 100);
+
+        SPEC = builder.build();
+    }
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/config/TTConfigManager.java
+================================================================================
+package io.github.lithum12.trackertips.config;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
+import io.github.lithum12.trackertips.TrackerTips;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.level.storage.LevelResource;
+import net.minecraftforge.fml.loading.FMLPaths;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.stream.Stream;
+
+public class TTConfigManager {
+
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+
+    private static TTSettings settings = new TTSettings();
+    private static final Map<ResourceLocation, HintDefinition> HINTS = new LinkedHashMap<>();
+
+    public static TTSettings settings() {
+        return settings;
+    }
+
+    public static Collection<HintDefinition> hints() {
+        return HINTS.values();
+    }
+
+
+    /** Client GUI helper: reads the global settings file without requiring a running server. */
+    public static TTSettings readGlobalSettings() {
+        try {
+            ensureGlobalDefaults();
+            Path cfg = globalFolder().resolve("global_config.json");
+            return GSON.fromJson(Files.readString(cfg, StandardCharsets.UTF_8), TTSettings.class);
+        } catch (Exception e) {
+            TrackerTips.LOGGER.error("Failed to read global TrackerTips settings", e);
+            return new TTSettings();
+        }
+    }
+
+    /** Client GUI helper: writes the global settings file. */
+    public static void saveGlobalSettings(TTSettings value) {
+        try {
+            Files.createDirectories(globalFolder());
+            Files.writeString(globalFolder().resolve("global_config.json"),
+                    GSON.toJson(value), StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            TrackerTips.LOGGER.error("Failed to save global TrackerTips settings", e);
+        }
+    }
+
+    public static Path globalFolder() {
+        return FMLPaths.CONFIGDIR.get().resolve(TrackerTips.MODID);
+    }
+
+    public static Path worldFolder(MinecraftServer server) {
+        return server.getWorldPath(LevelResource.ROOT).resolve(TrackerTips.MODID);
+    }
+
+    public static void init(MinecraftServer server) {
+        try {
+            ensureGlobalDefaults();
+            copyToWorldIfAbsent(server);
+            load(server);
+        } catch (IOException e) {
+            TrackerTips.LOGGER.error("[TrackerTips] Failed to load configuration", e);
+        }
+    }
+
+    public static void reload(MinecraftServer server) {
+        try {
+            ensureGlobalDefaults();
+            load(server);
+            TrackerTips.LOGGER.info("[TrackerTips] Configuration reloaded; loaded {} hint definitions.", HINTS.size());
+        } catch (IOException e) {
+            TrackerTips.LOGGER.error("[TrackerTips] Failed to reload configuration", e);
+        }
+    }
+
+    private static void ensureGlobalDefaults() throws IOException {
+        Path folder = globalFolder();
+        Files.createDirectories(folder.resolve("hints"));
+
+        Path cfg = folder.resolve("global_config.json");
+        if (!Files.exists(cfg)) {
+            Files.writeString(cfg, GSON.toJson(new TTSettings()), StandardCharsets.UTF_8);
+        }
+
+        Path welcome = folder.resolve("hints").resolve("welcome.json");
+        if (!Files.exists(welcome)) {
+            Files.writeString(welcome, DEFAULT_WELCOME_JSON, StandardCharsets.UTF_8);
+        }
+    }
+
+    private static void copyToWorldIfAbsent(MinecraftServer server) throws IOException {
+        Path global = globalFolder();
+        Path world = worldFolder(server);
+        Files.createDirectories(world.resolve("hints"));
+
+        Path globalCfg = global.resolve("global_config.json");
+        Path worldCfg = world.resolve("world_config.json");
+        if (Files.exists(globalCfg) && !Files.exists(worldCfg)) {
+            Files.copy(globalCfg, worldCfg);
+        }
+
+        Path globalHints = global.resolve("hints");
+        if (Files.isDirectory(globalHints)) {
+            try (Stream<Path> list = Files.list(globalHints)) {
+                for (Path file : list.filter(p -> p.toString().endsWith(".json")).toList()) {
+                    Path target = world.resolve("hints").resolve(file.getFileName().toString());
+                    if (!Files.exists(target)) {
+                        Files.copy(file, target);
+                    }
+                }
+            }
+        }
+    }
+
+    private static void load(MinecraftServer server) throws IOException {
+        TTSettings loaded = new TTSettings();
+
+        Path globalCfg = globalFolder().resolve("global_config.json");
+        Path worldCfg = worldFolder(server).resolve("world_config.json");
+
+        if (Files.exists(globalCfg)) {
+            loaded = GSON.fromJson(Files.readString(globalCfg, StandardCharsets.UTF_8), TTSettings.class);
+        }
+        if (Files.exists(worldCfg)) {
+            loaded = GSON.fromJson(Files.readString(worldCfg, StandardCharsets.UTF_8), TTSettings.class);
+        }
+
+        Map<ResourceLocation, HintDefinition> map = new LinkedHashMap<>();
+        loadHintFolder(globalFolder().resolve("hints"), map);
+        loadHintFolder(worldFolder(server).resolve("hints"), map);
+
+        settings = loaded;
+        HINTS.clear();
+        HINTS.putAll(map);
+    }
+
+    private static void loadHintFolder(Path folder, Map<ResourceLocation, HintDefinition> map) {
+        if (!Files.isDirectory(folder)) {
+            return;
+        }
+        try (Stream<Path> list = Files.list(folder)) {
+            list.filter(p -> p.toString().endsWith(".json")).forEach(p -> {
+                try {
+                    JsonObject json = GSON.fromJson(Files.readString(p, StandardCharsets.UTF_8), JsonObject.class);
+                    HintDefinition def = HintDefinition.fromJson(json);
+                    map.put(def.id(), def);
+                } catch (Exception e) {
+                    TrackerTips.LOGGER.error("[TrackerTips] Failed to parse: {}", p, e);
+                }
+            });
+        } catch (IOException e) {
+            TrackerTips.LOGGER.error("[TrackerTips] Failed to read directory: {}", folder, e);
+        }
+    }
+
+    // 【修改点】使用了 translate 翻译键，并加上了 title 字段
+    private static final String DEFAULT_WELCOME_JSON = """
+            {
+              "id": "trackertips:welcome",
+              "once": true,
+              "priority": 100,
+              "cooldown": 0,
+              "duration": 240,
+              "require": "all",
+              "accent": "F2C14E",
+              "sound": "minecraft:block.note_block.pling",
+              "title": {
+                "translate": "trackertips.hint.welcome.title",
+                "color": "gold",
+                "bold": true
+              },
+              "text": [
+                {
+                  "translate": "trackertips.hint.welcome.text",
+                  "color": "gray"
+                }
+              ],
+              "triggers": [
+                { "type": "trackertips:game_time", "mode": "after", "time": 200 }
+              ]
+            }
+            """;
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/config/TTSettings.java
+================================================================================
+package io.github.lithum12.trackertips.config;
+
+public class TTSettings {
+
+    public boolean enable = true;
+    public int checkInterval = 20;
+    public int maxActiveHints = 3;
+    public int defaultDuration = 240;
+    public boolean debug = false;
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/engine/HintEngine.java
+================================================================================
+package io.github.lithum12.trackertips.engine;
+
+import io.github.lithum12.trackertips.config.HintDefinition;
+import io.github.lithum12.trackertips.config.TTConfigManager;
+import io.github.lithum12.trackertips.network.HideHintPacket;
+import io.github.lithum12.trackertips.network.ShowHintPacket;
+import io.github.lithum12.trackertips.network.TTNetwork;
+import io.github.lithum12.trackertips.player.PlayerHintData;
+import io.github.lithum12.trackertips.player.TTCapabilities;
+import io.github.lithum12.trackertips.trigger.TriggerEvent;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+
+public class HintEngine {
+
+    /** 普通状态条件的低频轮询入口。 */
+    public static void tickPlayer(ServerPlayer player) {
+        if (!TTConfigManager.settings().enable) return;
+        PlayerHintData data = player.getCapability(TTCapabilities.HINT_DATA).orElse(null);
+        if (data == null) return;
+
+        for (HintDefinition def : TTConfigManager.hints()) {
+            checkAndShow(player, def, data, false, null);
+        }
+    }
+
+    /** 保留给兼容代码；事件现在应使用 triggerEvent()。 */
+    public static void checkPlayer(ServerPlayer player) {
+        tickPlayer(player);
+    }
+
+    /**
+     * Forge 原生事件入口。
+     * 事件发生后只检查与该事件有关的 event-trigger，同时检查 all 模式下的状态条件。
+     */
+    public static void triggerEvent(ServerPlayer player, TriggerEvent event) {
+        if (!TTConfigManager.settings().enable) return;
+        PlayerHintData data = player.getCapability(TTCapabilities.HINT_DATA).orElse(null);
+        if (data == null) return;
+
+        for (HintDefinition def : TTConfigManager.hints()) {
+            checkAndShow(player, def, data, true, event);
+        }
+    }
+
+    private static void checkAndShow(ServerPlayer player, HintDefinition def, PlayerHintData data,
+                                     boolean eventMode, TriggerEvent event) {
+        if (def.duration() <= 0) {
+            boolean matches = eventMode ? def.matchesEvent(player, event) : def.matches(player);
+            boolean currentState = def.currentState(player);
+            boolean isActive = data.isPersistentlyActive(def.id());
+
+            // A state trigger (such as health_below or potion_effect:active)
+            // must remain visible while its condition remains true.
+            if (!eventMode) {
+                matches = currentState;
+            }
+
+            if (matches && !isActive) {
+                sendShowPacket(player, def);
+                data.setPersistentlyActive(def.id(), true);
+            } else if (!currentState && isActive) {
+                TTNetwork.sendToPlayer(player, new HideHintPacket(def.id()));
+                data.setPersistentlyActive(def.id(), false);
+            }
+            return;
+        }
+
+        long now = player.level().getGameTime();
+        if (def.maxTimes() > 0 && data.getCount(def.id()) >= def.maxTimes()) return;
+        if (def.once() && data.hasShown(def.id())) return;
+        if (data.isInCooldown(def.id(), now)) return;
+
+        boolean matches = eventMode ? def.matchesEvent(player, event) : def.matches(player);
+        if (!matches) return;
+
+        data.incrementCount(def.id());
+        data.markShown(def.id());
+        if (def.cooldown() > 0) data.setCooldown(def.id(), now, def.cooldown());
+        sendShowPacket(player, def);
+    }
+
+    private static void sendShowPacket(ServerPlayer player, HintDefinition def) {
+        sendShowPacket(player, def, def.duration());
+    }
+
+    private static void sendShowPacket(ServerPlayer player, HintDefinition def, int duration) {
+        TrackerTipsLogger.logTrigger(player, def);
+        String titleJson = def.title() != null ? def.title().toString() : "";
+        TTNetwork.sendToPlayer(player, new ShowHintPacket(
+                def.id(), def.text().toString(), titleJson, def.icon(), duration,
+                def.priority(), def.accentColor(), def.sound()));
+    }
+
+    public static void forceShow(ServerPlayer player, ResourceLocation id) {
+        HintDefinition def = null;
+        for (HintDefinition d : TTConfigManager.hints()) {
+            if (d.id().equals(id)) { def = d; break; }
+        }
+        if (def == null) {
+            player.sendSystemMessage(Component.translatable("trackertips.command.test.not_found", id)
+                    .withStyle(ChatFormatting.RED));
+            return;
+        }
+        int duration = def.duration() > 0 ? def.duration() : TTConfigManager.settings().defaultDuration;
+        sendShowPacket(player, def, duration);
+        player.sendSystemMessage(Component.translatable("trackertips.command.test.sent", id)
+                .withStyle(ChatFormatting.GREEN));
+    }
+
+    private static final class TrackerTipsLogger {
+        static void logTrigger(ServerPlayer player, HintDefinition def) {
+            io.github.lithum12.trackertips.TrackerTips.LOGGER.debug(
+                    "[TrackerTips] Triggered hint {} -> {}", def.id(), player.getGameProfile().getName());
+        }
+    }
+}
+
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/event/TTCommonEvents.java
+================================================================================
+package io.github.lithum12.trackertips.event;
+
+import io.github.lithum12.trackertips.TrackerTips;
+import io.github.lithum12.trackertips.config.TTConfigManager;
+import io.github.lithum12.trackertips.engine.HintEngine;
+import io.github.lithum12.trackertips.player.PlayerHintDataProvider;
+import io.github.lithum12.trackertips.player.TTCapabilities;
+import io.github.lithum12.trackertips.trigger.TriggerEvent;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraftforge.event.AttachCapabilitiesEvent;
+import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.living.LivingDeathEvent;
+import net.minecraftforge.event.entity.living.MobEffectEvent;
+import net.minecraftforge.event.level.BlockEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.entity.player.AdvancementEvent;
+import net.minecraftforge.event.server.ServerAboutToStartEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+import io.github.lithum12.trackertips.command.TTCommands;
+
+@Mod.EventBusSubscriber(modid = TrackerTips.MODID)
+public class TTCommonEvents {
+
+    @SubscribeEvent
+    public static void onServerAboutToStart(ServerAboutToStartEvent event) {
+        TTConfigManager.init(event.getServer());
+    }
+
+    @SubscribeEvent
+    public static void onAttachCapabilities(AttachCapabilitiesEvent<Entity> event) {
+        if (event.getObject() instanceof Player) {
+            event.addCapability(
+                    new ResourceLocation(TrackerTips.MODID, "hint_data"),
+                    new PlayerHintDataProvider()
+            );
+        }
+    }
+
+    @SubscribeEvent
+    public static void onPlayerClone(PlayerEvent.Clone event) {
+        event.getOriginal().reviveCaps();
+        event.getOriginal().getCapability(TTCapabilities.HINT_DATA).ifPresent(oldData ->
+                event.getEntity().getCapability(TTCapabilities.HINT_DATA).ifPresent(newData ->
+                        newData.copyFrom(oldData)));
+        event.getOriginal().invalidateCaps();
+    }
+
+    /** 普通状态条件仍按配置的 interval 轮询。 */
+    @SubscribeEvent
+    public static void onPlayerTick(TickEvent.PlayerTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) return;
+        if (!(event.player instanceof ServerPlayer serverPlayer)) return;
+
+        int interval = Math.max(1, TTConfigManager.settings().checkInterval);
+        if (serverPlayer.tickCount % interval != 0) return;
+        HintEngine.tickPlayer(serverPlayer);
+    }
+
+    /** 玩家拾取物品：不再靠背包数量差值轮询，避免漏掉瞬时事件。 */
+    @SubscribeEvent
+    public static void onItemPickup(PlayerEvent.ItemPickupEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            HintEngine.triggerEvent(player, TriggerEvent.itemObtained(event.getStack()));
+        }
+    }
+
+    /** 玩家击杀实体。 */
+    @SubscribeEvent
+    public static void onLivingDeath(LivingDeathEvent event) {
+        if (!(event.getSource().getEntity() instanceof ServerPlayer player)) return;
+        if (event.getEntity() == player) return;
+        HintEngine.triggerEvent(player, TriggerEvent.kill(event.getEntity()));
+    }
+
+    /** 玩家破坏方块。 */
+    @SubscribeEvent
+    public static void onBlockBreak(BlockEvent.BreakEvent event) {
+        if (event.getPlayer() instanceof ServerPlayer player) {
+            HintEngine.triggerEvent(player, TriggerEvent.mine(event.getState()));
+        }
+    }
+
+    /** 获得药水效果。这里不再调用 checkPlayer()，避免提前吃掉“added”事件。 */
+    @SubscribeEvent
+    public static void onEffectAdded(MobEffectEvent.Added event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            HintEngine.triggerEvent(player, TriggerEvent.potionAdded(event.getEffectInstance()));
+        }
+    }
+
+    /** 药水效果移除。 */
+    @SubscribeEvent
+    public static void onEffectRemoved(MobEffectEvent.Remove event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            HintEngine.triggerEvent(player, TriggerEvent.potionRemoved(event.getEffectInstance()));
+        }
+    }
+
+    /** 进度达成。 */
+    @SubscribeEvent
+    public static void onAdvancement(AdvancementEvent.AdvancementEarnEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            HintEngine.triggerEvent(player, TriggerEvent.advancement(event.getAdvancement()));
+        }
+    }
+
+    /** 玩家切换维度。 */
+    @SubscribeEvent
+    public static void onDimensionChange(PlayerEvent.PlayerChangedDimensionEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            HintEngine.triggerEvent(player, TriggerEvent.dimensionChange(
+                    event.getFrom(), event.getTo()));
+        }
+    }
+
+    @SubscribeEvent
+    public static void onRegisterCommands(RegisterCommandsEvent event) {
+        TTCommands.register(event.getDispatcher());
+    }
+}
+
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/network/HideHintPacket.java
+================================================================================
+package io.github.lithum12.trackertips.network;
+
+import io.github.lithum12.trackertips.client.ClientHintManager;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
+import net.minecraftforge.network.NetworkEvent;
+
+import java.util.function.Supplier;
+
+public record HideHintPacket(ResourceLocation id) {
+
+    public static HideHintPacket decode(FriendlyByteBuf buf) {
+        return new HideHintPacket(buf.readResourceLocation());
+    }
+
+    public void encode(FriendlyByteBuf buf) {
+        buf.writeResourceLocation(id);
+    }
+
+    // 【新增】处理网络包的方法，解决找不到 handle 的编译错误
+    public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
+        NetworkEvent.Context ctx = ctxSupplier.get();
+        ctx.enqueueWork(() -> {
+            // 【安全机制】使用 DistExecutor 确保只在客户端执行，防止服务端崩溃
+            DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientHintManager.hide(id));
+        });
+        ctx.setPacketHandled(true);
+    }
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/network/ShowHintPacket.java
+================================================================================
+package io.github.lithum12.trackertips.network;
+
+import io.github.lithum12.trackertips.client.ClientHintManager;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.loading.FMLEnvironment;
+import net.minecraftforge.network.NetworkEvent;
+
+import java.util.function.Supplier;
+
+public class ShowHintPacket {
+
+    private final ResourceLocation id;
+    private final String textJson;
+    private final String titleJson;
+    private final String icon;
+    private final int duration;
+    private final int priority;
+    private final int accent;
+    private final String sound;
+
+    public ShowHintPacket(ResourceLocation id, String textJson, String titleJson, String icon,
+                          int duration, int priority, int accent, String sound) {
+        this.id = id;
+        this.textJson = textJson;
+        this.titleJson = titleJson;
+        this.icon = icon;
+        this.duration = duration;
+        this.priority = priority;
+        this.accent = accent;
+        this.sound = sound;
+    }
+
+    public static void encode(ShowHintPacket packet, FriendlyByteBuf buf) {
+        buf.writeResourceLocation(packet.id);
+        buf.writeUtf(packet.textJson, 32767);
+        buf.writeUtf(packet.titleJson, 32767);
+        buf.writeUtf(packet.icon, 256);
+        buf.writeVarInt(packet.duration);
+        buf.writeVarInt(packet.priority);
+        buf.writeVarInt(packet.accent);
+        buf.writeUtf(packet.sound, 256);
+    }
+
+    public static ShowHintPacket decode(FriendlyByteBuf buf) {
+        return new ShowHintPacket(
+                buf.readResourceLocation(),
+                buf.readUtf(32767),
+                buf.readUtf(32767),
+                buf.readUtf(256),
+                buf.readVarInt(),
+                buf.readVarInt(),
+                buf.readVarInt(),
+                buf.readUtf(256)
+        );
+    }
+
+    public static void handle(ShowHintPacket packet, Supplier<NetworkEvent.Context> ctxSupplier) {
+        NetworkEvent.Context ctx = ctxSupplier.get();
+        ctx.enqueueWork(() -> {
+            if (FMLEnvironment.dist == Dist.CLIENT) {
+                ClientHintManager.show(packet);
+            }
+        });
+        ctx.setPacketHandled(true);
+    }
+
+    public ResourceLocation id() { return id; }
+    public String textJson() { return textJson; }
+    public String titleJson() { return titleJson; }
+    public String icon() { return icon; }
+    public int duration() { return duration; }
+    public int priority() { return priority; }
+    public int accent() { return accent; }
+    public String sound() { return sound; }
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/network/TTNetwork.java
+================================================================================
+package io.github.lithum12.trackertips.network;
+
+import io.github.lithum12.trackertips.TrackerTips;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraftforge.network.NetworkRegistry;
+import net.minecraftforge.network.PacketDistributor;
+import net.minecraftforge.network.simple.SimpleChannel;
+
+public class TTNetwork {
+
+    private static final String PROTOCOL = "1";
+
+    public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
+            new ResourceLocation(TrackerTips.MODID, "main"),
+            () -> PROTOCOL,
+            PROTOCOL::equals,
+            PROTOCOL::equals
+    );
+
+    public static void register() {
+        // 已有的 ShowHintPacket 注册
+        CHANNEL.registerMessage(0, ShowHintPacket.class,
+                ShowHintPacket::encode, ShowHintPacket::decode, ShowHintPacket::handle);
+
+        // 新增：注册 HideHintPacket，ID 使用 2（避开 0）
+        CHANNEL.registerMessage(2, HideHintPacket.class,
+                HideHintPacket::encode, HideHintPacket::decode, HideHintPacket::handle);
+    }
+
+    // 原有的发送方法（只针对 ShowHintPacket）
+    public static void sendToPlayer(ServerPlayer player, ShowHintPacket packet) {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), packet);
+    }
+
+    // 可选：添加一个发送 HideHintPacket 的便捷方法
+    public static void sendToPlayer(ServerPlayer player, HideHintPacket packet) {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), packet);
+    }
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/player/PlayerHintData.java
+================================================================================
+package io.github.lithum12.trackertips.player;
+
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;   // 新增导入
+import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceLocation;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+public class PlayerHintData {
+
+    private final Set<ResourceLocation> shown = new HashSet<>();
+    private final Map<ResourceLocation, Long> cooldownUntil = new HashMap<>();
+    private final Map<ResourceLocation, Integer> triggerCounts = new HashMap<>();
+
+    // ===== 新增：持久活跃提示集合 =====
+    private final Set<ResourceLocation> activePersistent = new HashSet<>();
+
+    public boolean hasShown(ResourceLocation id) {
+        return shown.contains(id);
+    }
+
+    public void markShown(ResourceLocation id) {
+        shown.add(id);
+    }
+
+    public boolean isInCooldown(ResourceLocation id, long gameTime) {
+        Long until = cooldownUntil.get(id);
+        return until != null && gameTime < until;
+    }
+
+    public void setCooldown(ResourceLocation id, long gameTime, int cooldownTicks) {
+        cooldownUntil.put(id, gameTime + cooldownTicks);
+    }
+
+    public int getCount(ResourceLocation id) {
+        return triggerCounts.getOrDefault(id, 0);
+    }
+
+    public void incrementCount(ResourceLocation id) {
+        triggerCounts.put(id, getCount(id) + 1);
+    }
+
+    // ===== 新增：持久活跃状态查询与更新 =====
+    public boolean isPersistentlyActive(ResourceLocation id) {
+        return activePersistent.contains(id);
+    }
+
+    public void setPersistentlyActive(ResourceLocation id, boolean active) {
+        if (active) {
+            activePersistent.add(id);
+        } else {
+            activePersistent.remove(id);
+        }
+    }
+
+    public void clearAll() {
+        shown.clear();
+        cooldownUntil.clear();
+        triggerCounts.clear();
+        // ===== 清空持久活跃集合 =====
+        activePersistent.clear();
+    }
+
+    public void copyFrom(PlayerHintData other) {
+        shown.clear();
+        shown.addAll(other.shown);
+        cooldownUntil.clear();
+        cooldownUntil.putAll(other.cooldownUntil);
+        triggerCounts.clear();
+        triggerCounts.putAll(other.triggerCounts);
+        // ===== 拷贝持久活跃状态 =====
+        activePersistent.clear();
+        activePersistent.addAll(other.activePersistent);
+    }
+
+    public CompoundTag serialize() {
+        CompoundTag tag = new CompoundTag();
+
+        ListTag shownList = new ListTag();
+        for (ResourceLocation id : shown) {
+            shownList.add(StringTag.valueOf(id.toString()));
+        }
+        tag.put("Shown", shownList);
+
+        CompoundTag cooldowns = new CompoundTag();
+        cooldownUntil.forEach((id, until) -> cooldowns.putLong(id.toString(), until));
+        tag.put("Cooldowns", cooldowns);
+
+        CompoundTag counts = new CompoundTag();
+        triggerCounts.forEach((id, count) -> counts.putInt(id.toString(), count));
+        tag.put("TriggerCounts", counts);
+
+        // ===== 保存持久活跃列表 =====
+        ListTag activeList = new ListTag();
+        for (ResourceLocation id : activePersistent) {
+            activeList.add(StringTag.valueOf(id.toString()));
+        }
+        tag.put("ActivePersistent", activeList);
+
+        return tag;
+    }
+
+    public void deserialize(CompoundTag tag) {
+        shown.clear();
+        cooldownUntil.clear();
+        triggerCounts.clear();
+        activePersistent.clear();   // 清空再读取
+
+        ListTag shownList = tag.getList("Shown", Tag.TAG_STRING);
+        for (Tag t : shownList) {
+            shown.add(new ResourceLocation(t.getAsString()));
+        }
+
+        CompoundTag cooldowns = tag.getCompound("Cooldowns");
+        for (String key : cooldowns.getAllKeys()) {
+            cooldownUntil.put(new ResourceLocation(key), cooldowns.getLong(key));
+        }
+
+        CompoundTag counts = tag.getCompound("TriggerCounts");
+        for (String key : counts.getAllKeys()) {
+            triggerCounts.put(new ResourceLocation(key), counts.getInt(key));
+        }
+
+        // ===== 读取持久活跃列表 =====
+        ListTag activeList = tag.getList("ActivePersistent", Tag.TAG_STRING);
+        for (Tag t : activeList) {
+            activePersistent.add(new ResourceLocation(t.getAsString()));
+        }
+    }
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/player/PlayerHintDataProvider.java
+================================================================================
+package io.github.lithum12.trackertips.player;
+
+import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraftforge.common.capabilities.Capability;
+import net.minecraftforge.common.capabilities.ICapabilitySerializable;
+import net.minecraftforge.common.util.LazyOptional;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+public class PlayerHintDataProvider implements ICapabilitySerializable<CompoundTag> {
+
+    private final PlayerHintData data = new PlayerHintData();
+    private final LazyOptional<PlayerHintData> optional = LazyOptional.of(() -> data);
+
+    @NotNull
+    @Override
+    public <T> LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
+        if (cap == TTCapabilities.HINT_DATA) {
+            return optional.cast();
+        }
+        return LazyOptional.empty();
+    }
+
+    @Override
+    public CompoundTag serializeNBT() {
+        return data.serialize();
+    }
+
+    @Override
+    public void deserializeNBT(CompoundTag nbt) {
+        data.deserialize(nbt);
+    }
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/player/TTCapabilities.java
+================================================================================
+package io.github.lithum12.trackertips.player;
+
+import net.minecraftforge.common.capabilities.Capability;
+import net.minecraftforge.common.capabilities.CapabilityManager;
+import net.minecraftforge.common.capabilities.CapabilityToken;
+
+public class TTCapabilities {
+    public static final Capability<PlayerHintData> HINT_DATA =
+            CapabilityManager.get(new CapabilityToken<>() {});
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/trigger/AdvancementTrigger.java
+================================================================================
+package io.github.lithum12.trackertips.trigger;
+
+import com.google.gson.JsonObject;
+import io.github.lithum12.trackertips.TrackerTips;
+import net.minecraft.advancements.Advancement;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.GsonHelper;
+
+/** 进度触发器：done 使用 AdvancementEvent，state 使用状态轮询。 */
+public class AdvancementTrigger implements IEventHintTrigger {
+    private final ResourceLocation advancementId;
+    private final String mode;
+    private boolean warned = false;
+
+    public AdvancementTrigger(ResourceLocation advancementId, String mode) {
+        this.advancementId = advancementId;
+        this.mode = mode;
+    }
+
+    public static AdvancementTrigger fromJson(JsonObject json) {
+        return new AdvancementTrigger(
+                new ResourceLocation(GsonHelper.getAsString(json, "id")),
+                GsonHelper.getAsString(json, "mode", "done"));
+    }
+
+    @Override
+    public boolean isEventDriven() {
+        return !"state".equalsIgnoreCase(mode);
+    }
+
+    @Override
+    public boolean matchesEvent(ServerPlayer player, TriggerEvent event) {
+        if ("state".equalsIgnoreCase(mode) || event.type() != TriggerEvent.Type.ADVANCEMENT) {
+            return false;
+        }
+        Advancement advancement = event.advancement();
+        return advancement != null && advancementId.equals(advancement.getId());
+    }
+
+    @Override
+    public boolean test(ServerPlayer player) {
+        if (!"state".equalsIgnoreCase(mode)) return false;
+        Advancement advancement = player.getServer().getAdvancements().getAdvancement(advancementId);
+        if (advancement == null) {
+            if (!warned) {
+                warned = true;
+                TrackerTips.LOGGER.warn("[TrackerTips] Advancement not found; check the JSON id: {}", advancementId);
+            }
+            return false;
+        }
+        return player.getAdvancements().getOrStartProgress(advancement).isDone();
+    }
+}
+
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/trigger/GameTimeTrigger.java
+================================================================================
+package io.github.lithum12.trackertips.trigger;
+
+import com.google.gson.JsonObject;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.GsonHelper;
+
+import java.util.Locale;
+
+public class GameTimeTrigger implements IHintTrigger {
+
+    public enum Mode { AFTER, BEFORE, RANGE }
+
+    private final Mode mode;
+    private final long time;
+    private final long endTime;
+
+    public GameTimeTrigger(Mode mode, long time, long endTime) {
+        this.mode = mode;
+        this.time = time;
+        this.endTime = endTime;
+    }
+
+    public static GameTimeTrigger fromJson(JsonObject json) {
+        String modeStr = GsonHelper.getAsString(json, "mode", "after").toLowerCase(Locale.ROOT);
+        long time = GsonHelper.getAsLong(json, "time", 0L);
+        long endTime = GsonHelper.getAsLong(json, "end_time", 0L);
+
+        Mode mode = switch (modeStr) {
+            case "before" -> Mode.BEFORE;
+            case "range" -> Mode.RANGE;
+            default -> Mode.AFTER;
+        };
+        return new GameTimeTrigger(mode, time, endTime);
+    }
+
+    @Override
+    public boolean test(ServerPlayer player) {
+        long dayTime = player.level().getDayTime();
+        return switch (mode) {
+            case AFTER -> dayTime >= time;
+            case BEFORE -> dayTime < time;
+            case RANGE -> dayTime >= time && dayTime <= endTime;
+        };
+    }
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/trigger/HasItemTrigger.java
+================================================================================
+package io.github.lithum12.trackertips.trigger;
+
+import com.google.gson.JsonObject;
+import io.github.lithum12.trackertips.trigger.IHintTrigger;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.GsonHelper;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.registries.ForgeRegistries;
+
+public class HasItemTrigger implements IHintTrigger {
+
+    private final Item item;
+    private final int count;
+
+    public HasItemTrigger(Item item, int count) {
+        this.item = item;
+        this.count = count;
+    }
+
+    public static HasItemTrigger fromJson(JsonObject json) {
+        ResourceLocation id = new ResourceLocation(GsonHelper.getAsString(json, "item"));
+        Item item = ForgeRegistries.ITEMS.getValue(id);
+        if (item == null) {
+            throw new IllegalArgumentException("[TrackerTips] Unknown item: " + id);
+        }
+        int count = GsonHelper.getAsInt(json, "count", 1);
+        return new HasItemTrigger(item, count);
+    }
+
+    @Override
+    public boolean test(ServerPlayer player) {
+        int total = 0;
+        for (ItemStack stack : player.getInventory().items) {
+            if (stack.getItem() == item) {
+                total += stack.getCount();
+            }
+        }
+        return total >= count;
+    }
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/trigger/HealthBelowTrigger.java
+================================================================================
+package io.github.lithum12.trackertips.trigger;
+
+import com.google.gson.JsonObject;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.GsonHelper;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
+public class HealthBelowTrigger implements IHintTrigger {
+    private final float threshold;
+    private final Map<UUID, Boolean> wasInDanger = new HashMap<>();
+
+    public HealthBelowTrigger(float threshold) { this.threshold = threshold; }
+
+    public static HealthBelowTrigger fromJson(JsonObject json) {
+        return new HealthBelowTrigger(GsonHelper.getAsFloat(json, "health", 6.0f));
+    }
+
+    public boolean isCurrentlyBelow(ServerPlayer player) {
+        return player.getHealth() <= threshold && player.isAlive();
+    }
+
+    @Override
+    public boolean currentState(ServerPlayer player) {
+        return isCurrentlyBelow(player);
+    }
+
+    @Override
+    public boolean test(ServerPlayer player) {
+        boolean isDangerNow = isCurrentlyBelow(player);
+        Boolean wasDanger = wasInDanger.get(player.getUUID());
+        if (wasDanger == null) { wasInDanger.put(player.getUUID(), isDangerNow); return false; }
+        wasInDanger.put(player.getUUID(), isDangerNow);
+        // Edge trigger: safe before, dangerous now
+        return isDangerNow && !wasDanger;
+    }
+}
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/trigger/IEventHintTrigger.java
+================================================================================
+package io.github.lithum12.trackertips.trigger;
+
+import net.minecraft.server.level.ServerPlayer;
+
+/** Trigger that can be matched from a Forge event. */
+public interface IEventHintTrigger extends IHintTrigger {
+    /** Whether this trigger is event-driven rather than state-polled. */
+    default boolean isEventDriven() {
+        return true;
+    }
+
+    boolean matchesEvent(ServerPlayer player, TriggerEvent event);
+
+    @Override
+    default boolean test(ServerPlayer player) {
+        return false;
+    }
+}
+
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/trigger/IHintTrigger.java
+================================================================================
+package io.github.lithum12.trackertips.trigger;
+
+import net.minecraft.server.level.ServerPlayer;
+
+public interface IHintTrigger {
+    boolean test(ServerPlayer player);
+
+    /**
+     * Returns the current condition state. For normal state triggers this is
+     * the same as test(). Edge-triggered triggers may override it so persistent
+     * hints can stay visible after the transition has fired.
+     */
+    default boolean currentState(ServerPlayer player) {
+        return test(player);
+    }
+}
+
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/trigger/InDimensionTrigger.java
+================================================================================
+package io.github.lithum12.trackertips.trigger;
+
+import com.google.gson.JsonObject;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.GsonHelper;
+import net.minecraft.world.level.Level;
+
+/** 维度切换使用 PlayerChangedDimensionEvent；进入维度时只触发一次。 */
+public class InDimensionTrigger implements IEventHintTrigger {
+    private final ResourceKey<Level> dimension;
+
+    public InDimensionTrigger(ResourceKey<Level> dimension) { this.dimension = dimension; }
+
+    public static InDimensionTrigger fromJson(JsonObject json) {
+        String dim = GsonHelper.getAsString(json, "dimension", "minecraft:the_nether");
+        return new InDimensionTrigger(ResourceKey.create(Registries.DIMENSION, new ResourceLocation(dim)));
+    }
+
+    @Override
+    public boolean matchesEvent(ServerPlayer player, TriggerEvent event) {
+        return event.type() == TriggerEvent.Type.DIMENSION_CHANGE
+                && dimension.equals(event.toDimension())
+                && !dimension.equals(event.fromDimension());
+    }
+}
+
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/trigger/ItemObtainedTrigger.java
+================================================================================
+package io.github.lithum12.trackertips.trigger;
+
+import com.google.gson.JsonObject;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.GsonHelper;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.registries.ForgeRegistries;
+
+/** 通过 Forge ItemPickupEvent 精确检测新获得的物品。 */
+public class ItemObtainedTrigger implements IEventHintTrigger {
+    private final Item item;
+    private final int count;
+
+    public ItemObtainedTrigger(Item item, int count) {
+        this.item = item;
+        this.count = Math.max(1, count);
+    }
+
+    public static ItemObtainedTrigger fromJson(JsonObject json) {
+        ResourceLocation id = new ResourceLocation(GsonHelper.getAsString(json, "item"));
+        Item item = ForgeRegistries.ITEMS.getValue(id);
+        if (item == null) {
+            throw new IllegalArgumentException("[TrackerTips] Unknown item: " + id);
+        }
+        return new ItemObtainedTrigger(item, GsonHelper.getAsInt(json, "count", 1));
+    }
+
+    @Override
+    public boolean matchesEvent(ServerPlayer player, TriggerEvent event) {
+        if (event.type() != TriggerEvent.Type.ITEM_OBTAINED || event.itemStack() == null) {
+            return false;
+        }
+        ItemStack stack = event.itemStack();
+        return stack.is(item) && stack.getCount() >= count;
+    }
+}
+
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/trigger/KillEntityTrigger.java
+================================================================================
+package io.github.lithum12.trackertips.trigger;
+
+import com.google.gson.JsonObject;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.GsonHelper;
+import net.minecraft.world.entity.EntityType;
+import net.minecraftforge.registries.ForgeRegistries;
+
+/** 通过 LivingDeathEvent 精确检测玩家击杀。 */
+public class KillEntityTrigger implements IEventHintTrigger {
+    private final EntityType<?> entityType;
+
+    public KillEntityTrigger(EntityType<?> entityType) { this.entityType = entityType; }
+
+    public static KillEntityTrigger fromJson(JsonObject json) {
+        EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(
+                new ResourceLocation(GsonHelper.getAsString(json, "entity")));
+        if (type == null) throw new IllegalArgumentException("[TrackerTips] Unknown entity: " + json.get("entity"));
+        return new KillEntityTrigger(type);
+    }
+
+    @Override
+    public boolean matchesEvent(ServerPlayer player, TriggerEvent event) {
+        return event.type() == TriggerEvent.Type.KILL_ENTITY
+                && event.entity() != null
+                && event.entity().getType() == entityType;
+    }
+}
+
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/trigger/MineBlockTrigger.java
+================================================================================
+package io.github.lithum12.trackertips.trigger;
+
+import com.google.gson.JsonObject;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.GsonHelper;
+import net.minecraft.world.level.block.Block;
+import net.minecraftforge.registries.ForgeRegistries;
+
+/** 通过 BlockEvent.BreakEvent 精确检测方块破坏。 */
+public class MineBlockTrigger implements IEventHintTrigger {
+    private final Block block;
+
+    public MineBlockTrigger(Block block) { this.block = block; }
+
+    public static MineBlockTrigger fromJson(JsonObject json) {
+        Block b = ForgeRegistries.BLOCKS.getValue(
+                new ResourceLocation(GsonHelper.getAsString(json, "block")));
+        if (b == null) throw new IllegalArgumentException("[TrackerTips] Unknown block: " + json.get("block"));
+        return new MineBlockTrigger(b);
+    }
+
+    @Override
+    public boolean matchesEvent(ServerPlayer player, TriggerEvent event) {
+        return event.type() == TriggerEvent.Type.MINE_BLOCK
+                && event.blockState() != null
+                && event.blockState().is(block);
+    }
+}
+
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/trigger/PotionEffectTrigger.java
+================================================================================
+package io.github.lithum12.trackertips.trigger;
+
+import com.google.gson.JsonObject;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.GsonHelper;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraftforge.registries.ForgeRegistries;
+
+/**
+ * 药水效果触发器。
+ * added / removed 使用 Forge 原生事件，active 使用普通状态轮询。
+ */
+public class PotionEffectTrigger implements IEventHintTrigger {
+    private final MobEffect effect;
+    private final int amplifierMin;
+    private final String mode;
+
+    public PotionEffectTrigger(MobEffect effect, int amplifierMin, String mode) {
+        this.effect = effect;
+        this.amplifierMin = amplifierMin;
+        this.mode = mode;
+    }
+
+    public static PotionEffectTrigger fromJson(JsonObject json) {
+        ResourceLocation id = new ResourceLocation(GsonHelper.getAsString(json, "effect"));
+        MobEffect effect = ForgeRegistries.MOB_EFFECTS.getValue(id);
+        if (effect == null) {
+            throw new IllegalArgumentException("[TrackerTips] Unknown effect: " + id);
+        }
+        return new PotionEffectTrigger(effect,
+                GsonHelper.getAsInt(json, "amplifier_min", 0),
+                GsonHelper.getAsString(json, "mode", "added"));
+    }
+
+    @Override
+    public boolean isEventDriven() {
+        return !"active".equalsIgnoreCase(mode);
+    }
+
+    @Override
+    public boolean matchesEvent(ServerPlayer player, TriggerEvent event) {
+        if ("active".equalsIgnoreCase(mode)) return false;
+        if (event.effect() == null) return false;
+        if (!hasEffect(event.effect())) return false;
+
+        if ("removed".equalsIgnoreCase(mode)) {
+            return event.type() == TriggerEvent.Type.POTION_REMOVED;
+        }
+        return event.type() == TriggerEvent.Type.POTION_ADDED;
+    }
+
+    @Override
+    public boolean test(ServerPlayer player) {
+        if (!"active".equalsIgnoreCase(mode)) return false;
+        MobEffectInstance instance = player.getEffect(effect);
+        return instance != null && instance.getAmplifier() >= amplifierMin;
+    }
+
+    private boolean hasEffect(MobEffectInstance instance) {
+        return instance.getEffect() == effect && instance.getAmplifier() >= amplifierMin;
+    }
+}
+
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/trigger/TriggerEvent.java
+================================================================================
+package io.github.lithum12.trackertips.trigger;
+
+import net.minecraft.advancements.Advancement;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
+
+/** 统一包装 Forge 事件，避免每个 HintTrigger 都直接依赖事件总线。 */
+public final class TriggerEvent {
+    public enum Type {
+        ITEM_OBTAINED,
+        KILL_ENTITY,
+        MINE_BLOCK,
+        POTION_ADDED,
+        POTION_REMOVED,
+        ADVANCEMENT,
+        DIMENSION_CHANGE
+    }
+
+    private final Type type;
+    private final ItemStack itemStack;
+    private final Entity entity;
+    private final BlockState blockState;
+    private final MobEffectInstance effect;
+    private final Advancement advancement;
+    private final ResourceKey<Level> fromDimension;
+    private final ResourceKey<Level> toDimension;
+
+    private TriggerEvent(Type type, ItemStack itemStack, Entity entity, BlockState blockState,
+                         MobEffectInstance effect, Advancement advancement,
+                         ResourceKey<Level> fromDimension, ResourceKey<Level> toDimension) {
+        this.type = type;
+        this.itemStack = itemStack;
+        this.entity = entity;
+        this.blockState = blockState;
+        this.effect = effect;
+        this.advancement = advancement;
+        this.fromDimension = fromDimension;
+        this.toDimension = toDimension;
+    }
+
+    public static TriggerEvent itemObtained(ItemStack stack) {
+        return new TriggerEvent(Type.ITEM_OBTAINED, stack, null, null, null, null, null, null);
+    }
+
+    public static TriggerEvent kill(Entity entity) {
+        return new TriggerEvent(Type.KILL_ENTITY, null, entity, null, null, null, null, null);
+    }
+
+    public static TriggerEvent mine(BlockState state) {
+        return new TriggerEvent(Type.MINE_BLOCK, null, null, state, null, null, null, null);
+    }
+
+    public static TriggerEvent potionAdded(MobEffectInstance effect) {
+        return new TriggerEvent(Type.POTION_ADDED, null, null, null, effect, null, null, null);
+    }
+
+    public static TriggerEvent potionRemoved(MobEffectInstance effect) {
+        return new TriggerEvent(Type.POTION_REMOVED, null, null, null, effect, null, null, null);
+    }
+
+    public static TriggerEvent advancement(Advancement advancement) {
+        return new TriggerEvent(Type.ADVANCEMENT, null, null, null, null, advancement, null, null);
+    }
+
+    public static TriggerEvent dimensionChange(ResourceKey<Level> from, ResourceKey<Level> to) {
+        return new TriggerEvent(Type.DIMENSION_CHANGE, null, null, null, null, null, from, to);
+    }
+
+    public Type type() { return type; }
+    public ItemStack itemStack() { return itemStack; }
+    public Entity entity() { return entity; }
+    public BlockState blockState() { return blockState; }
+    public MobEffectInstance effect() { return effect; }
+    public Advancement advancement() { return advancement; }
+    public ResourceKey<Level> fromDimension() { return fromDimension; }
+    public ResourceKey<Level> toDimension() { return toDimension; }
+}
+
+
+================================================================================
+文件路径: src/main/java/io/github/lithum12/trackertips/trigger/Triggers.java
+================================================================================
+package io.github.lithum12.trackertips.trigger;
+
+import com.google.gson.JsonObject;
+import io.github.lithum12.trackertips.TrackerTips;
+import net.minecraft.resources.ResourceLocation;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
+
+public final class Triggers {
+
+    private static final Map<ResourceLocation, Function<JsonObject, IHintTrigger>> REGISTRY = new HashMap<>();
+
+    public static void init() {
+        register(new ResourceLocation(TrackerTips.MODID, "game_time"), GameTimeTrigger::fromJson);
+        register(new ResourceLocation(TrackerTips.MODID, "potion_effect"), PotionEffectTrigger::fromJson);
+        register(new ResourceLocation(TrackerTips.MODID, "has_item"), HasItemTrigger::fromJson);
+        register(new ResourceLocation(TrackerTips.MODID, "advancement"), AdvancementTrigger::fromJson);
+        register(new ResourceLocation(TrackerTips.MODID, "item_obtained"), ItemObtainedTrigger::fromJson);
+        register(new ResourceLocation(TrackerTips.MODID, "in_dimension"), InDimensionTrigger::fromJson);
+        register(new ResourceLocation(TrackerTips.MODID, "health_below"), HealthBelowTrigger::fromJson);
+        register(new ResourceLocation(TrackerTips.MODID, "kill_entity"), KillEntityTrigger::fromJson);
+        register(new ResourceLocation(TrackerTips.MODID, "mine_block"), MineBlockTrigger::fromJson);
+    }
+
+    public static void register(ResourceLocation id, Function<JsonObject, IHintTrigger> factory) {
+        REGISTRY.put(id, factory);
+    }
+
+    public static IHintTrigger create(ResourceLocation id, JsonObject json) {
+        Function<JsonObject, IHintTrigger> factory = REGISTRY.get(id);
+        if (factory == null) {
+            throw new IllegalArgumentException("Unknown trigger type: " + id);
+        }
+        return factory.apply(json);
+    }
+}
+
+================================================================================
+文件路径: src/main/resources/pack.mcmeta
+================================================================================
+{
+  "pack": {
+    "description": "trackertips resources",
+    "pack_format": 15
+  }
+}
+
+
+================================================================================
+文件路径: src/main/resources/assets/trackertips/lang/en_us.json
+================================================================================
+{
+  "trackertips.config.enable": "Show Hint Overlay",
+  "trackertips.config.offset_x": "Bottom-left X Offset",
+  "trackertips.config.offset_y": "Bottom-left Y Offset (from bottom)",
+  "trackertips.config.max_width": "Max Hint Panel Width",
+  "trackertips.config.max_hints": "Max Visible Hints",
+  "trackertips.config.fade_in": "Fade-in Ticks",
+  "trackertips.config.fade_out": "Fade-out Ticks",
+  "trackertips.command.reload.success": "[TrackerTips] Config reloaded! %s hints loaded.",
+  "trackertips.command.test.sent": "[TrackerTips] Hint sent: %s",
+  "trackertips.command.test.not_found": "[TrackerTips] Unknown hint: %s",
+  "trackertips.command.test.player_only": "[TrackerTips] This command can only be run by a player.",
+  "trackertips.hint.welcome.title": "Welcome!",
+  "trackertips.hint.welcome.text": "Edit config/trackertips to customize your hints.",
+  "key.categories.trackertips": "TrackerTips",
+  "key.trackertips.dismiss": "Dismiss Current Hint",
+  "key.trackertips.toggle": "Toggle Hints",
+  "trackertips.message.hints_on": "[TrackerTips] Hints shown",
+  "trackertips.message.hints_off": "[TrackerTips] Hints hidden",
+  "trackertips.gui.title": "TrackerTips",
+  "trackertips.gui.tab.general": "General",
+  "trackertips.gui.tab.events": "Events",
+  "trackertips.gui.tab.commands": "Commands",
+  "trackertips.gui.tab.usage": "Usage",
+  "trackertips.gui.enable": "Enable mod",
+  "trackertips.gui.max_hints": "Maximum active hints",
+  "trackertips.gui.edit": "Edit",
+  "trackertips.gui.delete": "Delete",
+  "trackertips.gui.add_event": "Add event",
+  "trackertips.gui.refresh": "Refresh",
+  "trackertips.gui.restore_defaults": "Restore defaults",
+  "trackertips.gui.reload_command": "Reload configuration",
+  "trackertips.gui.commands.description": "Reload the server-side TrackerTips event definitions.",
+  "trackertips.gui.usage.title": "TrackerTips usage",
+  "trackertips.gui.usage.line1": "Event files are stored in config/trackertips/hints/.",
+  "trackertips.gui.usage.line2": "Edit an event through Cloth Config, then reload the configuration.",
+  "trackertips.gui.usage.line3": "The event editor keeps the original JSON structure.",
+  "trackertips.gui.delete_confirm": "Delete %s?",
+  "trackertips.gui.confirm": "Confirm",
+  "trackertips.gui.create": "Create",
+  "trackertips.value.yes": "Yes",
+  "trackertips.value.no": "No",
+  "trackertips.gui.event_editor": "Edit %s",
+  "trackertips.gui.event.general": "General",
+  "trackertips.gui.event.content": "Content",
+  "trackertips.gui.event.triggers": "Triggers",
+  "trackertips.gui.event.id": "ID",
+  "trackertips.gui.event.once": "Trigger only once",
+  "trackertips.gui.event.priority": "Priority",
+  "trackertips.gui.event.cooldown": "Cooldown",
+  "trackertips.gui.event.duration": "Duration",
+  "trackertips.gui.event.require": "Requirement (any/all)",
+  "trackertips.gui.event.accent": "Accent color",
+  "trackertips.gui.event.sound": "Sound",
+  "trackertips.gui.event.icon": "Icon",
+  "trackertips.gui.event.max_times": "Maximum trigger count",
+  "trackertips.gui.event.title": "Title JSON",
+  "trackertips.gui.event.text": "Text JSON",
+  "trackertips.gui.event.trigger": "Trigger %s JSON",
+  "trackertips.gui.event.name": "File name",
+  "trackertips.gui.event.type": "Initial trigger type",
+  "trackertips.gui.debug": "Debug mode",
+  "trackertips.gui.check_interval": "Check interval",
+  "trackertips.gui.default_duration": "Default hint duration",
+  "trackertips.gui.client_settings": "Client Settings",
+  "trackertips.gui.file": "Event File",
+  "trackertips.gui.no_events": "No event files were found.",
+  "trackertips.gui.reload_hint": "Use “Reload Configuration” to apply server-side events after saving.",
+  "trackertips.gui.open_editor": "Edit with Cloth Config",
+  "trackertips.gui.event.save": "Save Event",
+  "trackertips.gui.event.invalid_json": "Invalid JSON; this field was not saved."
+}
+
+
+================================================================================
+文件路径: src/main/resources/assets/trackertips/lang/zh_cn.json
+================================================================================
+{
+  "trackertips.config.enable": "显示提示框",
+  "trackertips.config.offset_x": "左下角 X 偏移",
+  "trackertips.config.offset_y": "左下角 Y 偏移（距底部）",
+  "trackertips.config.max_width": "提示框最大宽度",
+  "trackertips.config.max_hints": "最大同时显示数量",
+  "trackertips.config.fade_in": "淡入时长（tick）",
+  "trackertips.config.fade_out": "淡出时长（tick）",
+  "trackertips.command.reload.success": "[TrackerTips] 配置已热重载！共加载 %s 个任务。",
+  "trackertips.command.test.sent": "[TrackerTips] 已强制发送提示：%s",
+  "trackertips.command.test.not_found": "[TrackerTips] 找不到任务：%s",
+  "trackertips.command.test.player_only": "[TrackerTips] 该命令只能由玩家执行。",
+  "trackertips.hint.welcome.title": "欢迎！",
+  "trackertips.hint.welcome.text": "提示内容可在 config/trackertips 中自定义。",
+  "key.categories.trackertips": "任务提示",
+  "key.trackertips.dismiss": "关闭当前提示",
+  "key.trackertips.toggle": "显示/隐藏提示",
+  "trackertips.message.hints_on": "[TrackerTips] 提示已显示",
+  "trackertips.message.hints_off": "[TrackerTips] 提示已隐藏",
+  "trackertips.gui.title": "TrackerTips",
+  "trackertips.gui.tab.general": "常规",
+  "trackertips.gui.tab.events": "事件",
+  "trackertips.gui.tab.commands": "命令",
+  "trackertips.gui.tab.usage": "用法",
+  "trackertips.gui.enable": "启用模组",
+  "trackertips.gui.max_hints": "最大同时显示数量",
+  "trackertips.gui.edit": "编辑",
+  "trackertips.gui.delete": "删除",
+  "trackertips.gui.add_event": "添加事件",
+  "trackertips.gui.refresh": "刷新",
+  "trackertips.gui.restore_defaults": "还原默认值",
+  "trackertips.gui.reload_command": "重新加载配置",
+  "trackertips.gui.commands.description": "重新加载服务器端 TrackerTips 事件定义。",
+  "trackertips.gui.usage.title": "TrackerTips 用法",
+  "trackertips.gui.usage.line1": "事件文件位于 config/trackertips/hints/。",
+  "trackertips.gui.usage.line2": "使用 Cloth Config 编辑事件，然后重新加载配置。",
+  "trackertips.gui.usage.line3": "事件编辑器会保留原始 JSON 结构。",
+  "trackertips.gui.delete_confirm": "确定删除 %s？",
+  "trackertips.gui.confirm": "确认",
+  "trackertips.gui.create": "创建",
+  "trackertips.value.yes": "是",
+  "trackertips.value.no": "否",
+  "trackertips.gui.event_editor": "编辑 %s",
+  "trackertips.gui.event.general": "常规",
+  "trackertips.gui.event.content": "内容",
+  "trackertips.gui.event.triggers": "触发器",
+  "trackertips.gui.event.id": "ID",
+  "trackertips.gui.event.once": "仅触发一次",
+  "trackertips.gui.event.priority": "优先级",
+  "trackertips.gui.event.cooldown": "冷却时间",
+  "trackertips.gui.event.duration": "持续时间",
+  "trackertips.gui.event.require": "条件关系（any/all）",
+  "trackertips.gui.event.accent": "强调色",
+  "trackertips.gui.event.sound": "声音",
+  "trackertips.gui.event.icon": "图标",
+  "trackertips.gui.event.max_times": "最大触发次数",
+  "trackertips.gui.event.title": "标题 JSON",
+  "trackertips.gui.event.text": "正文 JSON",
+  "trackertips.gui.event.trigger": "触发器 %s JSON",
+  "trackertips.gui.event.name": "文件名",
+  "trackertips.gui.event.type": "初始触发器类型",
+  "trackertips.gui.debug": "调试模式",
+  "trackertips.gui.check_interval": "检查间隔",
+  "trackertips.gui.default_duration": "默认提示持续时间",
+  "trackertips.gui.client_settings": "客户端设置",
+  "trackertips.gui.file": "事件文件",
+  "trackertips.gui.no_events": "没有找到事件文件。",
+  "trackertips.gui.reload_hint": "保存后可通过“重新加载配置”应用服务器端事件。",
+  "trackertips.gui.open_editor": "使用 Cloth Config 编辑",
+  "trackertips.gui.event.save": "保存事件",
+  "trackertips.gui.event.invalid_json": "JSON 格式无效，未保存该字段。"
+}
+
+
+================================================================================
+文件路径: src/main/resources/META-INF/mods.toml
+================================================================================
+modLoader = "javafml"
+loaderVersion = "${loader_version_range}"
+license = "${mod_license}"
+
+[[mods]]
+modId = "trackertips"
+version = "${mod_version}"
+displayName = "${mod_name}"
+authors = "${mod_authors}"
+
+description = '''${mod_description}'''
+
+[[dependencies."trackertips"]]
+modId = "forge"
+mandatory = true
+versionRange = "${forge_version_range}"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies."trackertips"]]
+modId = "minecraft"
+mandatory = true
+versionRange = "${minecraft_version_range}"
+ordering = "NONE"
+side = "BOTH"
+[[dependencies."trackertips"]]
+modId = "cloth_config"
+mandatory = true
+versionRange = "[11.1.106,12)"
+ordering = "AFTER"
+side = "CLIENT"
+
+
+================================================================================
+文件路径: run/config/trackertips/hints/diamond.json
+================================================================================
+{
+  "id": "trackertips:diamond_hunter",
+  "once": false,
+  "max_times": 3,
+  "cooldown": 20,
+  "priority": 200,
+  "duration": 200,
+  "accent": "00FFFF",
+  "icon": "minecraft:diamond",
+  "title": { "text": "✦ 钻石猎人", "color": "aqua", "bold": true },
+  "text": "你新获得了钻石！这是第 1~3 次提示。",
+  "triggers": [
+    { "type": "trackertips:item_obtained", "item": "minecraft:diamond", "count": 1 }
+  ]
+}
+
+================================================================================
+文件路径: run/config/trackertips/hints/enter_nether.json
+================================================================================
+{
+  "id": "trackertips:enter_nether",
+  "priority": 200, "duration": 300, "accent": "FF4500",
+  "icon": "minecraft:obsidian",
+  "title": { "text": "⚠ 维度警告", "color": "red", "bold": true },
+  "text": "你已踏入下界！这里极其危险，请确保你带了足够的方块和金锭。",
+  "triggers": [
+    { "type": "trackertips:in_dimension", "dimension": "minecraft:the_nether" }
+  ]
+}
+
+================================================================================
+文件路径: run/config/trackertips/hints/kill_creeper.json
+================================================================================
+{
+  "id": "trackertips:first_creeper",
+  "max_times": 1, "duration": 200, "accent": "00FF00",
+  "icon": "minecraft:creeper_head",
+  "title": { "text": "✦ 爆破专家", "color": "green", "bold": true },
+  "text": "你击杀了第一只苦力怕！小心它们临死前的爆炸，使用盾牌可以完美防御。",
+  "triggers": [
+    { "type": "trackertips:kill_entity", "entity": "minecraft:creeper" }
+  ]
+}
+
+================================================================================
+文件路径: run/config/trackertips/hints/low_health_persistent.json
+================================================================================
+{
+  "id": "trackertips:low_health_persistent",
+  "duration": -1,
+  "priority": 300,
+  "accent": "FF0000",
+  "icon": "minecraft:golden_apple",
+  "title": { "text": "❤ 生命危急", "color": "dark_red", "bold": true },
+  "text": "血量极低！请立即进食或撤退！",
+  "triggers": [
+    { "type": "trackertips:health_below", "health": 6.0 }
+  ]
+}
+
+================================================================================
+文件路径: run/config/trackertips/hints/mine_diamond.json
+================================================================================
+{
+  "id": "trackertips:mine_diamond_ore",
+  "max_times": 1, "duration": 240, "accent": "00FFFF",
+  "icon": "minecraft:diamond_ore",
+  "title": { "text": "✦ 稀有矿脉", "color": "aqua", "bold": true },
+  "text": "发现钻石矿！请务必使用铁镐或更高级的镐子挖掘，否则它将化为乌有。",
+  "triggers": [
+    { "type": "trackertips:mine_block", "block": "minecraft:diamond_ore" }
+  ]
+}
+
+================================================================================
+文件路径: run/config/trackertips/hints/strength_active.json
+================================================================================
+{
+  "id": "trackertips:strength_active",
+  "duration": -1,
+  "priority": 100,
+  "accent": "FF6B6B",
+  "icon": "minecraft:potion",
+  "title": { "text": "力量涌出", "color": "red", "bold": true },
+  "text": "你获得了力量！现在是输出的最佳时机。",
+  "triggers": [
+    { "type": "trackertips:potion_effect", "effect": "minecraft:strength", "mode": "active" }
+  ]
+}
+
+================================================================================
+文件路径: run/config/trackertips/hints/welcome.json
+================================================================================
+{
+  "id": "trackertips:welcome",
+  "once": true,
+  "priority": 100,
+  "cooldown": 0,
+  "duration": 240,
+  "require": "all",
+  "accent": "F2C14E",
+  "sound": "minecraft:block.note_block.pling",
+  "title": {
+    "translate": "trackertips.hint.welcome.title",
+    "color": "gold",
+    "bold": true
+  },
+  "text": [
+    {
+      "translate": "trackertips.hint.welcome.text",
+      "color": "gray"
+    }
+  ],
+  "triggers": [
+    { "type": "trackertips:game_time", "mode": "after", "time": 200 }
+  ]
+}
+
+

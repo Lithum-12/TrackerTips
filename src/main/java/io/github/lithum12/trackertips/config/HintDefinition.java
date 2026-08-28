@@ -89,7 +89,7 @@ public class HintDefinition {
         boolean hasEventTrigger = false;
         boolean result = requireAll;
         for (IHintTrigger trigger : triggers) {
-            if (trigger instanceof IEventHintTrigger) {
+            if (trigger instanceof IEventHintTrigger eventTrigger && eventTrigger.isEventDriven()) {
                 hasEventTrigger = true;
                 continue;
             }
@@ -113,7 +113,7 @@ public class HintDefinition {
         if (requireAll) {
             for (IHintTrigger trigger : triggers) {
                 boolean matched;
-                if (trigger instanceof IEventHintTrigger eventTrigger) {
+                if (trigger instanceof IEventHintTrigger eventTrigger && eventTrigger.isEventDriven()) {
                     matched = eventTrigger.matchesEvent(player, event);
                 } else {
                     matched = trigger.test(player);
@@ -132,6 +132,23 @@ public class HintDefinition {
             }
         }
         return false;
+    }
+
+    /** Current state for persistent state-based hints. Event-only triggers return false. */
+    public boolean currentState(ServerPlayer player) {
+        if (triggers.isEmpty()) return false;
+        boolean hasState = false;
+        boolean result = requireAll;
+        for (IHintTrigger trigger : triggers) {
+            if (trigger instanceof IEventHintTrigger eventTrigger && eventTrigger.isEventDriven()) {
+                continue;
+            }
+            hasState = true;
+            boolean matched = trigger.currentState(player);
+            if (requireAll) result &= matched;
+            else result |= matched;
+        }
+        return hasState && result;
     }
 
     public ResourceLocation id() { return id; }

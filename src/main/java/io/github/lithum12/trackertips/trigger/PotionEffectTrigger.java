@@ -35,6 +35,11 @@ public class PotionEffectTrigger implements IEventHintTrigger {
     }
 
     @Override
+    public boolean isEventDriven() {
+        return !"active".equalsIgnoreCase(mode);
+    }
+
+    @Override
     public boolean matchesEvent(ServerPlayer player, TriggerEvent event) {
         if ("active".equalsIgnoreCase(mode)) return false;
         if (event.effect() == null) return false;

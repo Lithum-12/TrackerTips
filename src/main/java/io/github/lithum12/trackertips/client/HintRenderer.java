@@ -36,6 +36,7 @@ public class HintRenderer {
         // 否则 GuiGraphics.fill 里的 Alpha 通道会失效，导致背景画不出来或者颜色错乱。
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
 
         for (ClientHintManager.ActiveHint hint : ClientHintManager.ACTIVE) {
             if (drawn >= maxHints) break;
@@ -50,7 +51,7 @@ public class HintRenderer {
             int y = bottom - height;
 
             float alphaProgress = hint.alpha(TTClientConfig.FADE_IN.get(), TTClientConfig.FADE_OUT.get());
-            int a = (int) (alphaProgress * 255);
+            int a = Math.max(24, (int) (alphaProgress * 255));
 
             // 2. 绘制背景面板（现在 Blend 已经开启，透明度正常生效！）
             drawPanel(guiGraphics, x, y, maxWidth, height, a, hint.accent());
@@ -90,10 +91,11 @@ public class HintRenderer {
     private static void drawPanel(GuiGraphics guiGraphics, int x, int y, int width, int height, int a, int accent) {
         int x2 = x + width;
         int y2 = y + height;
-        int background = withAlpha((int) (a * 0.82F), 0x14171C);
+        int backgroundAlpha = Mth.clamp((int) (a * 0.92F), 0, 255);
+        int background = withAlpha(backgroundAlpha, 0x14171C);
         guiGraphics.fill(x + 1, y + 1, x2 - 1, y2 - 1, background);
         guiGraphics.fillGradient(x + 1, y + 1, x2 - 1, y2 - 1,
-                withAlpha(Math.min(255, (int) (a * 0.82F) + 18), 0x232830), background);
+                withAlpha(Math.min(255, backgroundAlpha + 18), 0x232830), background);
         guiGraphics.fill(x, y, x2, y + 1, withAlpha(a, 0xFFFFFF));
         guiGraphics.fill(x, y2 - 1, x2, y2, withAlpha(Math.max(0, a - 36), 0xFFFFFF));
         guiGraphics.fill(x, y, x + 1, y2, withAlpha(a, 0xFFFFFF));

@@ -25,6 +25,11 @@ public class AdvancementTrigger implements IEventHintTrigger {
     }
 
     @Override
+    public boolean isEventDriven() {
+        return !"state".equalsIgnoreCase(mode);
+    }
+
+    @Override
     public boolean matchesEvent(ServerPlayer player, TriggerEvent event) {
         if ("state".equalsIgnoreCase(mode) || event.type() != TriggerEvent.Type.ADVANCEMENT) {
             return false;

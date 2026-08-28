@@ -49,12 +49,19 @@ public class HintEngine {
                                      boolean eventMode, TriggerEvent event) {
         if (def.duration() <= 0) {
             boolean matches = eventMode ? def.matchesEvent(player, event) : def.matches(player);
+            boolean currentState = def.currentState(player);
             boolean isActive = data.isPersistentlyActive(def.id());
+
+            // A state trigger (such as health_below or potion_effect:active)
+            // must remain visible while its condition remains true.
+            if (!eventMode) {
+                matches = currentState;
+            }
 
             if (matches && !isActive) {
                 sendShowPacket(player, def);
                 data.setPersistentlyActive(def.id(), true);
-            } else if (!matches && isActive && !eventMode) {
+            } else if (!currentState && isActive) {
                 TTNetwork.sendToPlayer(player, new HideHintPacket(def.id()));
                 data.setPersistentlyActive(def.id(), false);
             }
