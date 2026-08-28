@@ -19,3 +19,7 @@ hs_err_pid*
 
 # Common working directory
 run
+
+# Source archive files
+TrackerTips_源码合集.txt
+src/main.zip
