@@ -19,21 +19,21 @@ public class TTNetwork {
     );
 
     public static void register() {
-        // 已有的 ShowHintPacket 注册
+        // Existing ShowHintPacket registration
         CHANNEL.registerMessage(0, ShowHintPacket.class,
                 ShowHintPacket::encode, ShowHintPacket::decode, ShowHintPacket::handle);
 
-        // 新增：注册 HideHintPacket，ID 使用 2（避开 0）
+        // Added: registers HideHintPacket, using ID 2 (avoiding 0)
         CHANNEL.registerMessage(2, HideHintPacket.class,
                 HideHintPacket::encode, HideHintPacket::decode, HideHintPacket::handle);
     }
 
-    // 原有的发送方法（只针对 ShowHintPacket）
+    // Original send method (ShowHintPacket only)
     public static void sendToPlayer(ServerPlayer player, ShowHintPacket packet) {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), packet);
     }
 
-    // 可选：添加一个发送 HideHintPacket 的便捷方法
+    // Optional: a convenience method for sending HideHintPacket
     public static void sendToPlayer(ServerPlayer player, HideHintPacket packet) {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), packet);
     }

@@ -7,4 +7,7 @@ public class TTSettings {
     public int maxActiveHints = 3;
     public int defaultDuration = 240;
     public boolean debug = false;
+
+    /** When true, players may use "/tt" as a shorthand for "/trackertips". Off by default. */
+    public boolean shortcutCommand = false;
 }

@@ -8,7 +8,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.registries.ForgeRegistries;
 
-/** 通过 Forge ItemPickupEvent 精确检测新获得的物品。 */
+/** Precisely detects newly obtained items via Forge's ItemPickupEvent. */
 public class ItemObtainedTrigger implements IEventHintTrigger {
     private final Item item;
     private final int count;

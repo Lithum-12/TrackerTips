@@ -13,17 +13,37 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
+/**
+ * Loads, merges, and exposes TrackerTips' server-authoritative settings and hint definitions.
+ *
+ * <p>Settings and hints both layer two sources: a "global" copy under the game's
+ * {@code config/trackertips} folder (shared across every world/server) and a per-world copy
+ * under {@code <world>/trackertips} (copied from the global folder the first time a world is
+ * loaded, then edited independently). The per-world copy always wins when both exist; see
+ * {@link #load(MinecraftServer)}.
+ *
+ * <p><b>Addon entry point:</b> mods that want to ship hint definitions without requiring the
+ * server owner to hand-write JSON files can call {@link #registerHintProvider(Supplier)} from
+ * their own {@code FMLCommonSetupEvent} handler. Registered providers run on every
+ * {@link #reload(MinecraftServer)} (including the initial load), and their definitions are
+ * merged in before the JSON files are loaded - so a server owner can always override or disable
+ * an addon-provided hint by placing a same-id JSON file in their own hints folder.
+ */
 public class TTConfigManager {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     private static TTSettings settings = new TTSettings();
     private static final Map<ResourceLocation, HintDefinition> HINTS = new LinkedHashMap<>();
+    private static final List<Supplier<Collection<HintDefinition>>> HINT_PROVIDERS = new ArrayList<>();
 
     public static TTSettings settings() {
         return settings;
@@ -31,6 +51,29 @@ public class TTConfigManager {
 
     public static Collection<HintDefinition> hints() {
         return HINTS.values();
+    }
+
+    /** @return the loaded hint definition with the given id, or {@code null} if none is loaded. */
+    public static HintDefinition hintById(ResourceLocation id) {
+        return HINTS.get(id);
+    }
+
+    /**
+     * Addon entry point: registers a supplier of programmatically-built {@link HintDefinition}s.
+     * Call this once, from your own mod's {@code FMLCommonSetupEvent} handler (guaranteed to run
+     * after every mod, including TrackerTips, has constructed).
+     *
+     * <p>The supplier is invoked on every {@link #reload(MinecraftServer)}/{@link #init}, so it
+     * should be cheap and side-effect-free; build fresh {@link HintDefinition} instances (or
+     * return a cached immutable list) rather than doing file I/O each call. Definitions it
+     * returns are merged in before global/world JSON files are loaded, so a server owner can
+     * always override or remove one by adding a same-id file under their own {@code hints/}
+     * folder.
+     *
+     * @param provider supplies this mod's hint definitions; may return an empty collection.
+     */
+    public static void registerHintProvider(Supplier<Collection<HintDefinition>> provider) {
+        HINT_PROVIDERS.add(provider);
     }
 
 
@@ -65,6 +108,7 @@ public class TTConfigManager {
         return server.getWorldPath(LevelResource.ROOT).resolve(TrackerTips.MODID);
     }
 
+    /** Loads settings + hints for the first time this server session; also seeds global defaults and per-world copies if missing. */
     public static void init(MinecraftServer server) {
         try {
             ensureGlobalDefaults();
@@ -75,6 +119,7 @@ public class TTConfigManager {
         }
     }
 
+    /** Re-reads settings + hints from disk (and re-invokes every registered hint provider); used by {@code /trackertips reload}. */
     public static void reload(MinecraftServer server) {
         try {
             ensureGlobalDefaults();
@@ -138,6 +183,15 @@ public class TTConfigManager {
         }
 
         Map<ResourceLocation, HintDefinition> map = new LinkedHashMap<>();
+        for (Supplier<Collection<HintDefinition>> provider : HINT_PROVIDERS) {
+            try {
+                for (HintDefinition def : provider.get()) {
+                    map.put(def.id(), def);
+                }
+            } catch (Exception e) {
+                TrackerTips.LOGGER.error("[TrackerTips] A registered hint provider threw an exception", e);
+            }
+        }
         loadHintFolder(globalFolder().resolve("hints"), map);
         loadHintFolder(worldFolder(server).resolve("hints"), map);
 
@@ -165,7 +219,7 @@ public class TTConfigManager {
         }
     }
 
-    // 【修改点】使用了 translate 翻译键，并加上了 title 字段
+    // Uses a "translate" key for the title/text and includes a title field.
     private static final String DEFAULT_WELCOME_JSON = """
             {
               "id": "trackertips:welcome",

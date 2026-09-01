@@ -19,10 +19,11 @@ public class ShowHintPacket {
     private final int priority;
     private final int accent;
     private final String sound;
+    private final float pitch;
     private final String theme;
 
     public ShowHintPacket(ResourceLocation id, String textJson, String titleJson, String icon,
-                          int duration, int priority, int accent, String sound, String theme) {
+                          int duration, int priority, int accent, String sound, float pitch, String theme) {
         this.id = id;
         this.textJson = textJson;
         this.titleJson = titleJson;
@@ -31,6 +32,7 @@ public class ShowHintPacket {
         this.priority = priority;
         this.accent = accent;
         this.sound = sound;
+        this.pitch = pitch;
         this.theme = theme == null || theme.isBlank() ? "trackertips:default" : theme;
     }
 
@@ -43,6 +45,7 @@ public class ShowHintPacket {
         buf.writeVarInt(packet.priority);
         buf.writeVarInt(packet.accent);
         buf.writeUtf(packet.sound, 256);
+        buf.writeFloat(packet.pitch);
         buf.writeUtf(packet.theme, 256);
     }
 
@@ -56,6 +59,7 @@ public class ShowHintPacket {
                 buf.readVarInt(),
                 buf.readVarInt(),
                 buf.readUtf(256),
+                buf.readFloat(),
                 buf.readUtf(256)
         );
     }
@@ -78,5 +82,6 @@ public class ShowHintPacket {
     public int priority() { return priority; }
     public int accent() { return accent; }
     public String sound() { return sound; }
+    public float pitch() { return pitch; }
     public String theme() { return theme; }
 }

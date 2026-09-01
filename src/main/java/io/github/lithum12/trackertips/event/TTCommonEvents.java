@@ -50,7 +50,23 @@ public class TTCommonEvents {
         event.getOriginal().invalidateCaps();
     }
 
-    /** 普通状态条件仍按配置的 interval 轮询。 */
+    /**
+     * Feature: first-join trigger. Fires {@link TriggerEvent#firstJoin()} exactly once per
+     * player - the very first time they're ever observed logging in - then permanently marks
+     * them as having joined (see {@code PlayerHintData#markJoinedBefore}) so it never fires
+     * again for that player, even across server restarts.
+     */
+    @SubscribeEvent
+    public static void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        player.getCapability(TTCapabilities.HINT_DATA).ifPresent(data -> {
+            if (data.hasJoinedBefore()) return;
+            data.markJoinedBefore();
+            HintEngine.triggerEvent(player, TriggerEvent.firstJoin());
+        });
+    }
+
+    /** Regular state conditions are still polled at the configured interval. */
     @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
@@ -61,7 +77,7 @@ public class TTCommonEvents {
         HintEngine.tickPlayer(serverPlayer);
     }
 
-    /** 玩家拾取物品：不再靠背包数量差值轮询，避免漏掉瞬时事件。 */
+    /** Player picks up an item: no longer relies on polling inventory-count deltas, to avoid missing transient events. */
     @SubscribeEvent
     public static void onItemPickup(PlayerEvent.ItemPickupEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
@@ -69,7 +85,7 @@ public class TTCommonEvents {
         }
     }
 
-    /** 玩家击杀实体。 */
+    /** Player kills an entity. */
     @SubscribeEvent
     public static void onLivingDeath(LivingDeathEvent event) {
         if (!(event.getSource().getEntity() instanceof ServerPlayer player)) return;
@@ -77,7 +93,7 @@ public class TTCommonEvents {
         HintEngine.triggerEvent(player, TriggerEvent.kill(event.getEntity()));
     }
 
-    /** 玩家破坏方块。 */
+    /** Player breaks a block. */
     @SubscribeEvent
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
         if (event.getPlayer() instanceof ServerPlayer player) {
@@ -85,7 +101,7 @@ public class TTCommonEvents {
         }
     }
 
-    /** 获得药水效果。这里不再调用 checkPlayer()，避免提前吃掉“added”事件。 */
+    /** Potion effect gained. checkPlayer() is intentionally not called here, to avoid consuming the "added" event early. */
     @SubscribeEvent
     public static void onEffectAdded(MobEffectEvent.Added event) {
         if (event.getEntity() instanceof ServerPlayer player) {
@@ -93,7 +109,7 @@ public class TTCommonEvents {
         }
     }
 
-    /** 药水效果移除。 */
+    /** Potion effect removed. */
     @SubscribeEvent
     public static void onEffectRemoved(MobEffectEvent.Remove event) {
         if (event.getEntity() instanceof ServerPlayer player) {
@@ -101,7 +117,7 @@ public class TTCommonEvents {
         }
     }
 
-    /** 进度达成。 */
+    /** Advancement completed. */
     @SubscribeEvent
     public static void onAdvancement(AdvancementEvent.AdvancementEarnEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
@@ -109,7 +125,7 @@ public class TTCommonEvents {
         }
     }
 
-    /** 玩家切换维度。 */
+    /** Player changes dimension. */
     @SubscribeEvent
     public static void onDimensionChange(PlayerEvent.PlayerChangedDimensionEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {

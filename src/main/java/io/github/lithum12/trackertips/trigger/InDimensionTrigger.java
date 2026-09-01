@@ -8,7 +8,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.GsonHelper;
 import net.minecraft.world.level.Level;
 
-/** 维度切换使用 PlayerChangedDimensionEvent；进入维度时只触发一次。 */
+/** Dimension changes use PlayerChangedDimensionEvent; fires only once on entering the dimension. */
 public class InDimensionTrigger implements IEventHintTrigger {
     private final ResourceKey<Level> dimension;
 

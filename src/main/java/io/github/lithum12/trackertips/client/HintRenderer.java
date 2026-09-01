@@ -59,7 +59,16 @@ public class HintRenderer {
             float animationProgress = animationProgress(alphaProgress, theme.cardAnimation());
             int animationOffset = animationOffset(alphaProgress, theme.cardAnimation());
 
-            int y = bottom - height + animationOffset;
+            // Bug fix: this used to be `bottom - height + animationOffset`, and the stacking
+            // cursor for the NEXT hint above it was then derived from that same animated `y`
+            // (bottom = y - 4). Since animationOffset changes every frame while a card slides
+            // in/out, any hint stacked above one that was still animating would jitter and
+            // overlap with it in sync with the animation, instead of holding a stable position.
+            // stackY is the card's resting (fully-settled) position and is what the stack is
+            // built from; animationOffset is now applied only to this card's own on-screen
+            // position, not to where the next card's slot begins.
+            int stackY = bottom - height;
+            int y = stackY + animationOffset;
             int a = Math.max(24, (int) (animationProgress * 255));
 
             drawPanel(guiGraphics, x, y, maxWidth, height, a, theme);
@@ -75,15 +84,13 @@ public class HintRenderer {
 
             int textX = contentX + iconOffset;
             int currentY = contentY;
-            int titleColor = withAlpha(a, theme.titleColor());
-            int textColor = withAlpha(a, theme.textColor());
             float textProgress = animationProgress(alphaProgress, theme.textAnimation());
 
             // The text animation is deliberately kept as a rendering hook. Fade is implemented now;
             // other animation types can be added without changing event JSON or the theme format.
             int textAlpha = Math.max(0, Math.min(255, (int) (textProgress * 255)));
-            titleColor = withAlpha(textAlpha, theme.titleColor());
-            textColor = withAlpha(textAlpha, theme.textColor());
+            int titleColor = withAlpha(textAlpha, theme.titleColor());
+            int textColor = withAlpha(textAlpha, theme.textColor());
 
             for (FormattedCharSequence line : titleLines) {
                 guiGraphics.drawString(font, line, textX, currentY, titleColor, false);
@@ -96,7 +103,7 @@ public class HintRenderer {
                 currentY += lineHeight;
             }
 
-            bottom = y - 4;
+            bottom = stackY - 4;
             drawn++;
         }
 

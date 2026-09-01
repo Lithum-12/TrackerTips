@@ -7,7 +7,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.GsonHelper;
 
-/** 进度触发器：done 使用 AdvancementEvent，state 使用状态轮询。 */
+/** Advancement trigger: "done" uses AdvancementEvent, "state" uses state polling. */
 public class AdvancementTrigger implements IEventHintTrigger {
     private final ResourceLocation advancementId;
     private final String mode;

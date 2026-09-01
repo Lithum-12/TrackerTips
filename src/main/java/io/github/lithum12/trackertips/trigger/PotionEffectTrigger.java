@@ -9,8 +9,8 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraftforge.registries.ForgeRegistries;
 
 /**
- * 药水效果触发器。
- * added / removed 使用 Forge 原生事件，active 使用普通状态轮询。
+ * Potion effect trigger.
+ * added / removed use native Forge events; active uses regular state polling.
  */
 public class PotionEffectTrigger implements IEventHintTrigger {
     private final MobEffect effect;

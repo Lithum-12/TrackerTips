@@ -7,7 +7,7 @@ import net.minecraft.util.GsonHelper;
 import net.minecraft.world.entity.EntityType;
 import net.minecraftforge.registries.ForgeRegistries;
 
-/** 通过 LivingDeathEvent 精确检测玩家击杀。 */
+/** Precisely detects player kills via LivingDeathEvent. */
 public class KillEntityTrigger implements IEventHintTrigger {
     private final EntityType<?> entityType;
 

@@ -31,9 +31,10 @@ public class ClientHintManager {
     public static void show(ShowHintPacket packet) {
         for (ActiveHint hint : ACTIVE) {
             if (hint.id().equals(packet.id())) {
-                // 🚨【致命修复 2】防包轰炸机制：防止服务端每 Tick 疯狂发包导致 age 被无限重置为 0，从而永远不消失
-                if (hint.duration <= 0) return; // 永久提示已存在，无需刷新
-                if (hint.age < 20) return;     // 刚显示不到1秒(20tick)，忽略重复包
+                // Anti packet-spam guard: prevents the server resending every tick from endlessly resetting age back
+                // to 0 (which would keep the hint from ever disappearing).
+                if (hint.duration <= 0) return; // Permanent hint already showing; nothing to refresh
+                if (hint.age < 20) return;     // Shown for less than 1 second (20 ticks); ignore the duplicate packet
 
                 hint.refresh(packet.duration());
                 return;
@@ -59,7 +60,9 @@ public class ClientHintManager {
         if (!packet.sound().isEmpty()) {
             SoundEvent sound = BuiltInRegistries.SOUND_EVENT.get(new ResourceLocation(packet.sound()));
             if (sound != null && Minecraft.getInstance().player != null) {
-                Minecraft.getInstance().player.playSound(sound, 1.0F, 1.0F);
+                // Bug fix: pitch was hardcoded to 1.0F even though playSound already takes a
+                // pitch argument; packet.pitch() now carries the event's configured "pitch".
+                Minecraft.getInstance().player.playSound(sound, 1.0F, packet.pitch());
             }
         }
     }
@@ -87,7 +90,7 @@ public class ClientHintManager {
         private final int accent;
         private final String theme;
         private int duration;
-        public int age = 0; // 改为 public 方便外部防轰炸判断
+        public int age = 0; // Made public so the anti-spam check above can read it
 
         public ActiveHint(ResourceLocation id, Component title, Component text, ItemStack icon,
                           int duration, int priority, int accent, String theme) {

@@ -19,17 +19,17 @@ public class TTClientEvents {
         Minecraft minecraft = Minecraft.getInstance();
         ClientHintManager.tick();
 
-        // 打开任何界面（聊天框 / 菜单 / 背包）时不响应按键，防止打字误触
+        // Don't respond to keybinds while any screen (chat / menu / inventory) is open, to avoid misfires while typing
         if (minecraft.player == null || minecraft.screen != null) {
             return;
         }
 
-        // 按 H：关闭当前正在显示的提示
+        // Press H: dismiss the currently displayed hint
         while (TTKeyMappings.DISMISS_HINT.consumeClick()) {
             ClientHintManager.dismissCurrent();
         }
 
-        // 按 J：显示 / 隐藏全部提示
+        // Press J: show / hide all hints
         while (TTKeyMappings.TOGGLE_HINT.consumeClick()) {
             boolean visible = ClientHintManager.toggleVisible();
             minecraft.player.sendSystemMessage(Component.translatable(

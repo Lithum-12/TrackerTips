@@ -11,13 +11,13 @@ import net.minecraftforge.fml.common.Mod;
 @Mod.EventBusSubscriber(modid = TrackerTips.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public class TTKeyMappings {
 
-    // 默认 H：关闭当前提示
+    // Default H: dismiss the current hint
     public static final KeyMapping DISMISS_HINT = new KeyMapping(
             "key.trackertips.dismiss",
             InputConstants.KEY_H,
             "key.categories.trackertips");
 
-    // 默认 J：显示 / 隐藏全部提示
+    // Default J: show / hide all hints
     public static final KeyMapping TOGGLE_HINT = new KeyMapping(
             "key.trackertips.toggle",
             InputConstants.KEY_J,

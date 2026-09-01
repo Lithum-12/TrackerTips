@@ -7,7 +7,7 @@ import net.minecraft.util.GsonHelper;
 import net.minecraft.world.level.block.Block;
 import net.minecraftforge.registries.ForgeRegistries;
 
-/** 通过 BlockEvent.BreakEvent 精确检测方块破坏。 */
+/** Precisely detects block breaking via BlockEvent.BreakEvent. */
 public class MineBlockTrigger implements IEventHintTrigger {
     private final Block block;
 

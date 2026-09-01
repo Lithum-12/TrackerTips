@@ -55,6 +55,7 @@
   "trackertips.gui.event.require.any": "任一满足（any）",
   "trackertips.gui.event.accent": "强调色",
   "trackertips.gui.event.sound": "声音",
+  "trackertips.gui.event.pitch": "音调",
   "trackertips.gui.event.icon": "图标",
   "trackertips.gui.event.max_times": "最大触发次数",
   "trackertips.gui.event.title": "标题 JSON",
@@ -65,6 +66,7 @@
   "trackertips.gui.debug": "调试模式",
   "trackertips.gui.check_interval": "检查间隔",
   "trackertips.gui.default_duration": "默认提示持续时间",
+  "trackertips.gui.shortcut_command": "启用快捷指令",
   "trackertips.gui.client_settings": "客户端设置",
   "trackertips.gui.file": "事件文件",
   "trackertips.gui.no_events": "没有找到事件文件。",
@@ -133,6 +135,7 @@
   "trackertips.gui.trigger_type.health_below": "生命值低于",
   "trackertips.gui.trigger_type.kill_entity": "击杀实体",
   "trackertips.gui.trigger_type.mine_block": "挖掘方块",
+  "trackertips.gui.trigger_type.first_join": "首次加入",
   "trackertips.gui.event.game_time_mode": "时间模式",
   "trackertips.gui.event.mode.after": "在之后",
   "trackertips.gui.event.mode.before": "在之前",
@@ -154,5 +157,12 @@
   "trackertips.gui.event.dimension": "维度",
   "trackertips.gui.event.health": "生命值",
   "trackertips.gui.event.entity": "实体",
-  "trackertips.gui.event.block": "方块"
+  "trackertips.gui.event.block": "方块",
+  "trackertips.gui.event.chain": "链式触发",
+  "trackertips.gui.event.chain_enabled": "启用链式触发",
+  "trackertips.gui.event.chain_action": "链式动作",
+  "trackertips.gui.event.chain_action.dismiss": "关闭当前提示",
+  "trackertips.gui.event.chain_action.next": "显示下一个提示",
+  "trackertips.gui.event.chain_next": "下一个提示 ID",
+  "trackertips.gui.event.chain_trigger": "链式触发器"
 }

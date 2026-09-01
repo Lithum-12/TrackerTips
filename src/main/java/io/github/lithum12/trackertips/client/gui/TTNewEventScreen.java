@@ -50,6 +50,12 @@ public final class TTNewEventScreen extends Screen {
         Path file = TTConfigManager.globalFolder().resolve("hints").resolve(name);
         try {
             Files.createDirectories(file.getParent());
+            // Snapshot BEFORE the file is created (or before this session's first edit, if it
+            // already existed) so that backing out of the parent config screen without saving
+            // deletes a brand-new event outright instead of leaving the just-created stub behind.
+            if (parent instanceof TTConfigScreen configScreen) {
+                configScreen.registerEventEdit(file);
+            }
             if (!Files.exists(file)) {
                 JsonObject json = new JsonObject();
                 json.addProperty("id", TrackerTips.MODID + ":" + name.substring(0, name.length() - 5));

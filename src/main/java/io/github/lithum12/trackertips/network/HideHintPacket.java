@@ -19,11 +19,11 @@ public record HideHintPacket(ResourceLocation id) {
         buf.writeResourceLocation(id);
     }
 
-    // 【新增】处理网络包的方法，解决找不到 handle 的编译错误
+    // Handles the packet; this method was added to fix a "cannot find handle" compile error.
     public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
         NetworkEvent.Context ctx = ctxSupplier.get();
         ctx.enqueueWork(() -> {
-            // 【安全机制】使用 DistExecutor 确保只在客户端执行，防止服务端崩溃
+            // Safety mechanism: uses DistExecutor to guarantee this only runs on the client, preventing a server crash.
             DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientHintManager.hide(id));
         });
         ctx.setPacketHandled(true);

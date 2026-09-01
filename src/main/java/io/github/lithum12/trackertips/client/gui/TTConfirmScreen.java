@@ -26,7 +26,11 @@ public final class TTConfirmScreen extends Screen {
                 .bounds(width / 2 - 105, height - 45, 100, 20).build());
         addRenderableWidget(Button.builder(Component.translatable("gui.yes"), b -> {
             confirmed.run();
-            minecraft.setScreen(parent);
+            // The callback may navigate to a freshly rebuilt screen. Only return to the parent
+            // when the callback did not already change the current screen.
+            if (minecraft.screen == this) {
+                minecraft.setScreen(parent);
+            }
         }).bounds(width / 2 + 5, height - 45, 100, 20).build());
     }
 

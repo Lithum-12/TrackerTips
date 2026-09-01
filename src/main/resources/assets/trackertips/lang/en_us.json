@@ -55,6 +55,7 @@
   "trackertips.gui.event.require.any": "Any (any)",
   "trackertips.gui.event.accent": "Accent color",
   "trackertips.gui.event.sound": "Sound",
+  "trackertips.gui.event.pitch": "Sound Pitch",
   "trackertips.gui.event.icon": "Icon",
   "trackertips.gui.event.max_times": "Maximum trigger count",
   "trackertips.gui.event.title": "Title JSON",
@@ -65,6 +66,7 @@
   "trackertips.gui.debug": "Debug mode",
   "trackertips.gui.check_interval": "Check interval",
   "trackertips.gui.default_duration": "Default hint duration",
+  "trackertips.gui.shortcut_command": "Enable Shortcut Command",
   "trackertips.gui.client_settings": "Client Settings",
   "trackertips.gui.file": "Event File",
   "trackertips.gui.no_events": "No event files were found.",
@@ -133,6 +135,7 @@
   "trackertips.gui.trigger_type.health_below": "Health Below",
   "trackertips.gui.trigger_type.kill_entity": "Kill Entity",
   "trackertips.gui.trigger_type.mine_block": "Mine Block",
+  "trackertips.gui.trigger_type.first_join": "First Join",
   "trackertips.gui.event.game_time_mode": "Time Mode",
   "trackertips.gui.event.mode.after": "After",
   "trackertips.gui.event.mode.before": "Before",
@@ -154,5 +157,12 @@
   "trackertips.gui.event.dimension": "Dimension",
   "trackertips.gui.event.health": "Health",
   "trackertips.gui.event.entity": "Entity",
-  "trackertips.gui.event.block": "Block"
+  "trackertips.gui.event.block": "Block",
+  "trackertips.gui.event.chain": "Chain",
+  "trackertips.gui.event.chain_enabled": "Enable Chain",
+  "trackertips.gui.event.chain_action": "Chain Action",
+  "trackertips.gui.event.chain_action.dismiss": "Dismiss This Hint",
+  "trackertips.gui.event.chain_action.next": "Show Next Hint",
+  "trackertips.gui.event.chain_next": "Next Hint ID",
+  "trackertips.gui.event.chain_trigger": "Chain Trigger"
 }

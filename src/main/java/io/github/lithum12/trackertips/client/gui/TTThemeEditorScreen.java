@@ -93,17 +93,19 @@ public final class TTThemeEditorScreen {
     private static void addColor(ConfigEntryBuilder entry, ConfigCategory category, String key,
                                  int value, java.util.function.Consumer<String> consumer) {
         String hex = String.format("%06X", value & 0xFFFFFF);
-        category.addEntry(entry.startStrField(Component.translatable(key), hex)
-                .setDefaultValue(hex)
-                .setSaveConsumer(consumer)
+        category.addEntry(entry.startColorField(Component.translatable(key), value)
+                .setDefaultValue(value)
+                .setSaveConsumer(consumerValue -> consumer.accept(String.format("%06X", consumerValue & 0xFFFFFF)))
                 .build());
     }
 
     private static void addAnimation(ConfigEntryBuilder entry, ConfigCategory category, String key,
                                      TTAnimation animation, boolean card, AtomicReference<TTTheme> working) {
-        category.addEntry(entry.startStrField(
-                Component.translatable(key + ".type"), animation.type())
-                .setDefaultValue(animation.type())
+        category.addEntry(entry.startStringDropdownMenu(
+                Component.translatable(key + ".type"), animation.type(),
+                value -> Component.translatable("trackertips.gui.theme.animation.type." + value))
+                .setSelections(java.util.List.of("none", "fade", "slide", "slide_up"))
+                .setDefaultValue("fade")
                 .setSaveConsumer(value -> {
                     TTAnimation old = card ? working.get().cardAnimation() : working.get().textAnimation();
                     TTAnimation next = new TTAnimation(value, old.duration(), old.delay());

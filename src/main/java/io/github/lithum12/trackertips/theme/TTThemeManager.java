@@ -15,16 +15,43 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Stream;
 
-/** Loads user-editable themes from config/trackertips/themes. */
+/**
+ * Loads user-editable themes from {@code config/trackertips/themes}, merged with any built-in
+ * themes addon mods have registered via {@link #registerBuiltIn}.
+ *
+ * <p><b>Addon entry point:</b> mods that want to ship a ready-made theme (rather than requiring
+ * the server owner to hand-write a theme JSON file) can call
+ * {@link #registerBuiltIn(TTTheme)} from their own {@code FMLCommonSetupEvent} handler. Built-in
+ * themes are loaded first; a user-authored JSON file with the same {@link TTTheme#id()} always
+ * overrides it, so server owners retain full control.
+ */
 public final class TTThemeManager {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Map<String, TTTheme> THEMES = new LinkedHashMap<>();
+    private static final Map<String, TTTheme> BUILT_IN = new LinkedHashMap<>();
     private static boolean initialized;
 
     private TTThemeManager() {}
 
     public static Path folder() {
         return FMLPaths.CONFIGDIR.get().resolve(TrackerTips.MODID).resolve("themes");
+    }
+
+    /**
+     * Addon entry point: registers a theme that's always available, without requiring a user-
+     * authored JSON file. Call this from your own mod's {@code FMLCommonSetupEvent} handler.
+     *
+     * <p>Safe to call after themes have already been loaded once - the registration is applied
+     * immediately, and will also be applied again on any future {@link #load()}. A user JSON
+     * file sharing {@code theme.id()} always takes precedence over a built-in registration.
+     *
+     * @param theme a fully-defined theme; see {@link TTTheme#defaults(String)} for a starting point.
+     */
+    public static synchronized void registerBuiltIn(TTTheme theme) {
+        BUILT_IN.put(theme.id(), theme);
+        if (initialized) {
+            THEMES.putIfAbsent(theme.id(), theme);
+        }
     }
 
     public static synchronized void ensureDefaults() {
@@ -40,8 +67,10 @@ public final class TTThemeManager {
         }
     }
 
+    /** Reloads every theme: built-in registrations first (lowest precedence), then user JSON files (override). */
     public static synchronized void load() {
         THEMES.clear();
+        THEMES.putAll(BUILT_IN);
         try {
             Files.createDirectories(folder());
             try (Stream<Path> stream = Files.list(folder())) {
