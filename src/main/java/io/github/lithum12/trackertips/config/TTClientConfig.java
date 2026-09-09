@@ -13,6 +13,10 @@ public class TTClientConfig {
     public static final ForgeConfigSpec.IntValue MAX_HINTS;
     public static final ForgeConfigSpec.IntValue FADE_IN;
     public static final ForgeConfigSpec.IntValue FADE_OUT;
+    /** Feature: configurable popup anchor. See {@link HintAnchor}. */
+    public static final ForgeConfigSpec.EnumValue<HintAnchor> ANCHOR;
+    /** Feature: chat-overlap safeguard. See {@code HintRenderer}'s use of this value. */
+    public static final ForgeConfigSpec.BooleanValue AVOID_CHAT_OVERLAP;
 
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
@@ -20,10 +24,13 @@ public class TTClientConfig {
         ENABLE = builder.comment("Enable the hint overlay")
                 .translation("trackertips.config.enable")
                 .define("enable", true);
-        OFFSET_X = builder.comment("Left-bottom X offset")
+        ANCHOR = builder.comment("Where the hint popup stack is anchored on screen")
+                .translation("trackertips.config.anchor")
+                .defineEnum("anchor", HintAnchor.BOTTOM_LEFT);
+        OFFSET_X = builder.comment("Horizontal offset from whichever edge the anchor touches (ignored for centered anchors: top/bottom)")
                 .translation("trackertips.config.offset_x")
                 .defineInRange("offset_x", 6, 0, 1000);
-        OFFSET_Y = builder.comment("Left-bottom Y offset from bottom")
+        OFFSET_Y = builder.comment("Vertical offset from whichever edge the anchor touches (ignored for the middle-anchored left/right)")
                 .translation("trackertips.config.offset_y")
                 .defineInRange("offset_y", 45, 0, 1000);
         MAX_WIDTH = builder.comment("Max hint panel width")
@@ -38,6 +45,10 @@ public class TTClientConfig {
         FADE_OUT = builder.comment("Fade-out ticks")
                 .translation("trackertips.config.fade_out")
                 .defineInRange("fade_out", 10, 1, 100);
+        AVOID_CHAT_OVERLAP = builder.comment(
+                        "Reserve space for the chat log so left-anchored hints never render underneath it")
+                .translation("trackertips.config.avoid_chat_overlap")
+                .define("avoid_chat_overlap", true);
 
         SPEC = builder.build();
     }

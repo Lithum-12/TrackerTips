@@ -39,7 +39,8 @@ public final class TTClothEventEditor {
         HEALTH_BELOW("trackertips:health_below", "trackertips.gui.trigger_type.health_below"),
         KILL_ENTITY("trackertips:kill_entity", "trackertips.gui.trigger_type.kill_entity"),
         MINE_BLOCK("trackertips:mine_block", "trackertips.gui.trigger_type.mine_block"),
-        FIRST_JOIN("trackertips:first_join", "trackertips.gui.trigger_type.first_join");
+        FIRST_JOIN("trackertips:first_join", "trackertips.gui.trigger_type.first_join"),
+        IN_STRUCTURE("trackertips:in_structure", "trackertips.gui.trigger_type.in_structure");
 
         final String id;
         final String translationKey;
@@ -162,6 +163,7 @@ public final class TTClothEventEditor {
                                    JsonObject json, String key, boolean def) {
         category.addEntry(entry.startBooleanToggle(Component.translatable(label), getBool(json, key, def))
                 .setDefaultValue(def)
+                .setTooltip(Component.translatable(label + ".tooltip"))
                 .setSaveConsumer(v -> json.addProperty(key, v))
                 .build());
     }
@@ -170,6 +172,7 @@ public final class TTClothEventEditor {
                                   JsonObject json, String key, String def) {
         category.addEntry(entry.startStrField(Component.translatable(label), getString(json, key, def))
                 .setDefaultValue(def)
+                .setTooltip(Component.translatable(label + ".tooltip"))
                 .setSaveConsumer(v -> json.addProperty(key, v))
                 .build());
     }
@@ -178,6 +181,7 @@ public final class TTClothEventEditor {
                                JsonObject json, String key, int def, int min, int max) {
         category.addEntry(entry.startIntField(Component.translatable(label), getInt(json, key, def))
                 .setDefaultValue(def).setMin(min).setMax(max)
+                .setTooltip(Component.translatable(label + ".tooltip"))
                 .setSaveConsumer(v -> json.addProperty(key, v))
                 .build());
     }
@@ -188,6 +192,7 @@ public final class TTClothEventEditor {
                                  JsonObject json, String key, float def, float min, float max) {
         category.addEntry(entry.startFloatField(Component.translatable(label), getFloat(json, key, def))
                 .setDefaultValue(def).setMin(min).setMax(max)
+                .setTooltip(Component.translatable(label + ".tooltip"))
                 .setSaveConsumer(v -> json.addProperty(key, v))
                 .build());
     }
@@ -201,7 +206,8 @@ public final class TTClothEventEditor {
                         v -> Component.translatable("trackertips.gui.event.require." + v))
                 .setSelections(List.of("all", "any"))
                 .setDefaultValue("all")
-                .setSaveConsumer(v -> json.addProperty("require", v))
+                .setTooltip(Component.translatable("trackertips.gui.event.require.tooltip"))
+                        .setSaveConsumer(v -> json.addProperty("require", v))
                 .build());
     }
 
@@ -210,7 +216,8 @@ public final class TTClothEventEditor {
         category.addEntry(entry.startColorField(
                         Component.translatable("trackertips.gui.event.accent"), value)
                 .setDefaultValue(0xF2C14E)
-                .setSaveConsumer(v -> json.addProperty("accent", String.format(Locale.ROOT, "%06X", v & 0xFFFFFF)))
+                .setTooltip(Component.translatable("trackertips.gui.event.accent.tooltip"))
+                        .setSaveConsumer(v -> json.addProperty("accent", String.format(Locale.ROOT, "%06X", v & 0xFFFFFF)))
                 .build());
     }
 
@@ -231,7 +238,8 @@ public final class TTClothEventEditor {
                         })
                 .setSelections(ids)
                 .setDefaultValue(ids.get(0))
-                .setSaveConsumer(v -> json.addProperty("theme", v))
+                .setTooltip(Component.translatable("trackertips.gui.event.theme.tooltip"))
+                        .setSaveConsumer(v -> json.addProperty("theme", v))
                 .build());
     }
 
@@ -252,7 +260,8 @@ public final class TTClothEventEditor {
                         ComponentKind.class, titleKind)
                 .setEnumNameProvider(value -> Component.translatable(((ComponentKind) value).translationKey))
                 .setDefaultValue(titleKind)
-                .setSaveConsumer(value -> {
+                .setTooltip(Component.translatable("trackertips.gui.event.component_kind.tooltip"))
+                        .setSaveConsumer(value -> {
                     if (value == ComponentKind.TRANSLATE) {
                         String v = getString(titleObject, "translate", "");
                         titleObject.remove("text");
@@ -269,7 +278,8 @@ public final class TTClothEventEditor {
                         Component.translatable("trackertips.gui.event.component_value"),
                         componentValue(titleObject))
                 .setDefaultValue("")
-                .setSaveConsumer(value -> {
+                .setTooltip(Component.translatable("trackertips.gui.event.component_value.tooltip"))
+                        .setSaveConsumer(value -> {
                     if (titleObject.has("translate")) titleObject.addProperty("translate", value);
                     else titleObject.addProperty("text", value);
                     json.add("title", titleObject);
@@ -279,7 +289,8 @@ public final class TTClothEventEditor {
                         Component.translatable("trackertips.gui.event.component_color"),
                         parseColorNameOrHex(getString(titleObject, "color", "FFFFFF"), 0xFFFFFF))
                 .setDefaultValue(0xFFFFFF)
-                .setSaveConsumer(value -> {
+                .setTooltip(Component.translatable("trackertips.gui.event.component_color.tooltip"))
+                        .setSaveConsumer(value -> {
                     if ((value & 0xFFFFFF) == 0xFFFFFF) titleObject.remove("color");
                     else titleObject.addProperty("color", String.format(Locale.ROOT, "%06X", value & 0xFFFFFF));
                     json.add("title", titleObject);
@@ -289,7 +300,8 @@ public final class TTClothEventEditor {
                         Component.translatable("trackertips.gui.event.component_bold"),
                         getBool(titleObject, "bold", false))
                 .setDefaultValue(false)
-                .setSaveConsumer(value -> {
+                .setTooltip(Component.translatable("trackertips.gui.event.component_bold.tooltip"))
+                        .setSaveConsumer(value -> {
                     setBoolean(titleObject, "bold", value);
                     json.add("title", titleObject);
                 })
@@ -298,7 +310,8 @@ public final class TTClothEventEditor {
                         Component.translatable("trackertips.gui.event.component_italic"),
                         getBool(titleObject, "italic", false))
                 .setDefaultValue(false)
-                .setSaveConsumer(value -> {
+                .setTooltip(Component.translatable("trackertips.gui.event.component_italic.tooltip"))
+                        .setSaveConsumer(value -> {
                     setBoolean(titleObject, "italic", value);
                     json.add("title", titleObject);
                 })
@@ -326,7 +339,8 @@ public final class TTClothEventEditor {
                             ComponentKind.from(element))
                     .setEnumNameProvider(value -> Component.translatable(((ComponentKind) value).translationKey))
                     .setDefaultValue(ComponentKind.from(element))
-                    .setSaveConsumer(value -> {
+                    .setTooltip(Component.translatable("trackertips.gui.event.component_kind.tooltip"))
+                        .setSaveConsumer(value -> {
                         if (value == ComponentKind.TRANSLATE) {
                             String v = getString(component, "translate", "");
                             component.remove("text");
@@ -343,7 +357,8 @@ public final class TTClothEventEditor {
                             Component.translatable("trackertips.gui.event.component_value"),
                             componentValue(component))
                     .setDefaultValue("")
-                    .setSaveConsumer(value -> {
+                    .setTooltip(Component.translatable("trackertips.gui.event.component_value.tooltip"))
+                        .setSaveConsumer(value -> {
                         if (component.has("translate")) component.addProperty("translate", value);
                         else component.addProperty("text", value);
                     })
@@ -353,7 +368,8 @@ public final class TTClothEventEditor {
                             Component.translatable("trackertips.gui.event.component_color"),
                             parseColorNameOrHex(getString(component, "color", "FFFFFF"), 0xFFFFFF))
                     .setDefaultValue(0xFFFFFF)
-                    .setSaveConsumer(value -> {
+                    .setTooltip(Component.translatable("trackertips.gui.event.component_color.tooltip"))
+                        .setSaveConsumer(value -> {
                         if ((value & 0xFFFFFF) == 0xFFFFFF) component.remove("color");
                         else component.addProperty("color", String.format(Locale.ROOT, "%06X", value & 0xFFFFFF));
                     })
@@ -363,14 +379,16 @@ public final class TTClothEventEditor {
                             Component.translatable("trackertips.gui.event.component_bold"),
                             getBool(component, "bold", false))
                     .setDefaultValue(false)
-                    .setSaveConsumer(value -> setBoolean(component, "bold", value))
+                    .setTooltip(Component.translatable("trackertips.gui.event.component_bold.tooltip"))
+                        .setSaveConsumer(value -> setBoolean(component, "bold", value))
                     .build());
 
             sub.add(entry.startBooleanToggle(
                             Component.translatable("trackertips.gui.event.component_italic"),
                             getBool(component, "italic", false))
                     .setDefaultValue(false)
-                    .setSaveConsumer(value -> setBoolean(component, "italic", value))
+                    .setTooltip(Component.translatable("trackertips.gui.event.component_italic.tooltip"))
+                        .setSaveConsumer(value -> setBoolean(component, "italic", value))
                     .build());
 
             category.addEntry(sub.build());
@@ -480,6 +498,7 @@ public final class TTClothEventEditor {
             case KILL_ENTITY -> trigger.addProperty("entity", "minecraft:zombie");
             case MINE_BLOCK -> trigger.addProperty("block", "minecraft:stone");
             case FIRST_JOIN -> { /* no extra fields */ }
+            case IN_STRUCTURE -> trigger.addProperty("structure", "minecraft:village_plains");
         }
     }
 
@@ -511,7 +530,8 @@ public final class TTClothEventEditor {
                         type)
                 .setEnumNameProvider(value -> Component.translatable(((TriggerType) value).translationKey))
                 .setDefaultValue(type)
-                .setSaveConsumer(value -> {
+                .setTooltip(Component.translatable("trackertips.gui.event.trigger_type.tooltip"))
+                        .setSaveConsumer(value -> {
                     activeType[0] = value;
                     replaceTriggerType(trigger, value);
                 })
@@ -533,18 +553,21 @@ public final class TTClothEventEditor {
                                 GameTimeMode.from(getString(trigger, "mode", "after")))
                         .setEnumNameProvider(value -> Component.translatable("trackertips.gui.event.mode." + ((GameTimeMode) value).id))
                         .setDefaultValue(GameTimeMode.AFTER)
+                        .setTooltip(Component.translatable("trackertips.gui.event.game_time_mode.tooltip"))
                         .setSaveConsumer(v -> { if (activeType[0] == type) trigger.addProperty("mode", v.id); })
                         .build());
                 sub.add(entry.startLongField(
                                 Component.translatable("trackertips.gui.event.time"),
                                 getLong(trigger, "time", 200))
                         .setMin(0)
+                        .setTooltip(Component.translatable("trackertips.gui.event.time.tooltip"))
                         .setSaveConsumer(v -> { if (activeType[0] == type) trigger.addProperty("time", v); })
                         .build());
                 sub.add(entry.startLongField(
                                 Component.translatable("trackertips.gui.event.end_time"),
                                 getLong(trigger, "end_time", 400))
                         .setMin(0)
+                        .setTooltip(Component.translatable("trackertips.gui.event.end_time.tooltip"))
                         .setSaveConsumer(v -> { if (activeType[0] == type) trigger.addProperty("end_time", v); })
                         .build());
             }
@@ -555,23 +578,28 @@ public final class TTClothEventEditor {
                                 PotionMode.from(getString(trigger, "mode", "added")))
                         .setEnumNameProvider(value -> Component.translatable("trackertips.gui.event.potion_mode." + ((PotionMode) value).id))
                         .setDefaultValue(PotionMode.ADDED)
+                        .setTooltip(Component.translatable("trackertips.gui.event.potion_mode.tooltip"))
                         .setSaveConsumer(v -> { if (activeType[0] == type) trigger.addProperty("mode", v.id); })
                         .build());
                 sub.add(entry.startStrField(Component.translatable("trackertips.gui.event.effect"),
                                 getString(trigger, "effect", "minecraft:speed"))
+                        .setTooltip(Component.translatable("trackertips.gui.event.effect.tooltip"))
                         .setSaveConsumer(v -> { if (activeType[0] == type) trigger.addProperty("effect", v); }).build());
                 sub.add(entry.startIntField(Component.translatable("trackertips.gui.event.amplifier_min"),
                                 getInt(trigger, "amplifier_min", 0))
                         .setMin(0).setMax(255)
+                        .setTooltip(Component.translatable("trackertips.gui.event.amplifier_min.tooltip"))
                         .setSaveConsumer(v -> { if (activeType[0] == type) trigger.addProperty("amplifier_min", v); }).build());
             }
             case HAS_ITEM, ITEM_OBTAINED -> {
                 sub.add(entry.startStrField(Component.translatable("trackertips.gui.event.item"),
                                 getString(trigger, "item", "minecraft:stone"))
+                        .setTooltip(Component.translatable("trackertips.gui.event.item.tooltip"))
                         .setSaveConsumer(v -> { if (activeType[0] == type) trigger.addProperty("item", v); }).build());
                 sub.add(entry.startIntField(Component.translatable("trackertips.gui.event.count"),
                                 getInt(trigger, "count", 1))
                         .setMin(1).setMax(99999)
+                        .setTooltip(Component.translatable("trackertips.gui.event.count.tooltip"))
                         .setSaveConsumer(v -> { if (activeType[0] == type) trigger.addProperty("count", v); }).build());
             }
             case ADVANCEMENT -> {
@@ -581,30 +609,41 @@ public final class TTClothEventEditor {
                                 AdvancementMode.from(getString(trigger, "mode", "done")))
                         .setEnumNameProvider(value -> Component.translatable("trackertips.gui.event.advancement_mode." + ((AdvancementMode) value).id))
                         .setDefaultValue(AdvancementMode.DONE)
+                        .setTooltip(Component.translatable("trackertips.gui.event.advancement_mode.tooltip"))
                         .setSaveConsumer(v -> { if (activeType[0] == type) trigger.addProperty("mode", v.id); })
                         .build());
                 sub.add(entry.startStrField(Component.translatable("trackertips.gui.event.advancement_id"),
                                 getString(trigger, "id", "minecraft:story/root"))
+                        .setTooltip(Component.translatable("trackertips.gui.event.advancement_id.tooltip"))
                         .setSaveConsumer(v -> { if (activeType[0] == type) trigger.addProperty("id", v); }).build());
             }
             case IN_DIMENSION -> sub.add(entry.startStrField(
                             Component.translatable("trackertips.gui.event.dimension"),
                             getString(trigger, "dimension", "minecraft:the_nether"))
-                    .setSaveConsumer(v -> { if (activeType[0] == type) trigger.addProperty("dimension", v); }).build());
+                    .setTooltip(Component.translatable("trackertips.gui.event.dimension.tooltip"))
+                        .setSaveConsumer(v -> { if (activeType[0] == type) trigger.addProperty("dimension", v); }).build());
             case HEALTH_BELOW -> sub.add(entry.startFloatField(
                             Component.translatable("trackertips.gui.event.health"),
                             getFloat(trigger, "health", 6.0F))
                     .setMin(0).setMax(1000)
-                    .setSaveConsumer(v -> { if (activeType[0] == type) trigger.addProperty("health", v); }).build());
+                    .setTooltip(Component.translatable("trackertips.gui.event.health.tooltip"))
+                        .setSaveConsumer(v -> { if (activeType[0] == type) trigger.addProperty("health", v); }).build());
             case KILL_ENTITY -> sub.add(entry.startStrField(
                             Component.translatable("trackertips.gui.event.entity"),
                             getString(trigger, "entity", "minecraft:zombie"))
-                    .setSaveConsumer(v -> { if (activeType[0] == type) trigger.addProperty("entity", v); }).build());
+                    .setTooltip(Component.translatable("trackertips.gui.event.entity.tooltip"))
+                        .setSaveConsumer(v -> { if (activeType[0] == type) trigger.addProperty("entity", v); }).build());
             case MINE_BLOCK -> sub.add(entry.startStrField(
                             Component.translatable("trackertips.gui.event.block"),
                             getString(trigger, "block", "minecraft:stone"))
-                    .setSaveConsumer(v -> { if (activeType[0] == type) trigger.addProperty("block", v); }).build());
+                    .setTooltip(Component.translatable("trackertips.gui.event.block.tooltip"))
+                        .setSaveConsumer(v -> { if (activeType[0] == type) trigger.addProperty("block", v); }).build());
             case FIRST_JOIN -> { /* no extra fields */ }
+            case IN_STRUCTURE -> sub.add(entry.startStrField(
+                            Component.translatable("trackertips.gui.event.structure"),
+                            getString(trigger, "structure", "minecraft:village_plains"))
+                    .setTooltip(Component.translatable("trackertips.gui.event.structure.tooltip"))
+                        .setSaveConsumer(v -> { if (activeType[0] == type) trigger.addProperty("structure", v); }).build());
         }
 
         category.addEntry(sub.build());
@@ -636,7 +675,8 @@ public final class TTClothEventEditor {
         category.addEntry(entry.startBooleanToggle(
                         Component.translatable("trackertips.gui.event.chain_enabled"), chainEnabled)
                 .setDefaultValue(false)
-                .setSaveConsumer(v -> {
+                .setTooltip(Component.translatable("trackertips.gui.event.chain_enabled.tooltip"))
+                        .setSaveConsumer(v -> {
                     if (v) json.add("chain", chainJson);
                     else json.remove("chain");
                 })
@@ -647,12 +687,14 @@ public final class TTClothEventEditor {
                         v -> Component.translatable("trackertips.gui.event.chain_action." + v))
                 .setSelections(List.of("dismiss", "next"))
                 .setDefaultValue("dismiss")
-                .setSaveConsumer(v -> chainJson.addProperty("action", v))
+                .setTooltip(Component.translatable("trackertips.gui.event.chain_action.tooltip"))
+                        .setSaveConsumer(v -> chainJson.addProperty("action", v))
                 .build());
 
         category.addEntry(entry.startStrField(
                         Component.translatable("trackertips.gui.event.chain_next"), initialNext)
-                .setSaveConsumer(v -> chainJson.addProperty("next", v))
+                .setTooltip(Component.translatable("trackertips.gui.event.chain_next.tooltip"))
+                        .setSaveConsumer(v -> chainJson.addProperty("next", v))
                 .build());
 
         TriggerType type = TriggerType.fromId(getString(triggerJson, "type", TriggerType.MINE_BLOCK.id));
@@ -667,7 +709,8 @@ public final class TTClothEventEditor {
                         type)
                 .setEnumNameProvider(value -> Component.translatable(((TriggerType) value).translationKey))
                 .setDefaultValue(type)
-                .setSaveConsumer(value -> {
+                .setTooltip(Component.translatable("trackertips.gui.event.trigger_type.tooltip"))
+                        .setSaveConsumer(value -> {
                     activeType[0] = value;
                     replaceTriggerType(triggerJson, value);
                 })
@@ -682,18 +725,21 @@ public final class TTClothEventEditor {
                                 GameTimeMode.from(getString(triggerJson, "mode", "after")))
                         .setEnumNameProvider(value -> Component.translatable("trackertips.gui.event.mode." + ((GameTimeMode) value).id))
                         .setDefaultValue(GameTimeMode.AFTER)
+                        .setTooltip(Component.translatable("trackertips.gui.event.game_time_mode.tooltip"))
                         .setSaveConsumer(v -> { if (activeType[0] == type) triggerJson.addProperty("mode", v.id); })
                         .build());
                 sub.add(entry.startLongField(
                                 Component.translatable("trackertips.gui.event.time"),
                                 getLong(triggerJson, "time", 200))
                         .setMin(0)
+                        .setTooltip(Component.translatable("trackertips.gui.event.time.tooltip"))
                         .setSaveConsumer(v -> { if (activeType[0] == type) triggerJson.addProperty("time", v); })
                         .build());
                 sub.add(entry.startLongField(
                                 Component.translatable("trackertips.gui.event.end_time"),
                                 getLong(triggerJson, "end_time", 400))
                         .setMin(0)
+                        .setTooltip(Component.translatable("trackertips.gui.event.end_time.tooltip"))
                         .setSaveConsumer(v -> { if (activeType[0] == type) triggerJson.addProperty("end_time", v); })
                         .build());
             }
@@ -704,23 +750,28 @@ public final class TTClothEventEditor {
                                 PotionMode.from(getString(triggerJson, "mode", "added")))
                         .setEnumNameProvider(value -> Component.translatable("trackertips.gui.event.potion_mode." + ((PotionMode) value).id))
                         .setDefaultValue(PotionMode.ADDED)
+                        .setTooltip(Component.translatable("trackertips.gui.event.potion_mode.tooltip"))
                         .setSaveConsumer(v -> { if (activeType[0] == type) triggerJson.addProperty("mode", v.id); })
                         .build());
                 sub.add(entry.startStrField(Component.translatable("trackertips.gui.event.effect"),
                                 getString(triggerJson, "effect", "minecraft:speed"))
+                        .setTooltip(Component.translatable("trackertips.gui.event.effect.tooltip"))
                         .setSaveConsumer(v -> { if (activeType[0] == type) triggerJson.addProperty("effect", v); }).build());
                 sub.add(entry.startIntField(Component.translatable("trackertips.gui.event.amplifier_min"),
                                 getInt(triggerJson, "amplifier_min", 0))
                         .setMin(0).setMax(255)
+                        .setTooltip(Component.translatable("trackertips.gui.event.amplifier_min.tooltip"))
                         .setSaveConsumer(v -> { if (activeType[0] == type) triggerJson.addProperty("amplifier_min", v); }).build());
             }
             case HAS_ITEM, ITEM_OBTAINED -> {
                 sub.add(entry.startStrField(Component.translatable("trackertips.gui.event.item"),
                                 getString(triggerJson, "item", "minecraft:stone"))
+                        .setTooltip(Component.translatable("trackertips.gui.event.item.tooltip"))
                         .setSaveConsumer(v -> { if (activeType[0] == type) triggerJson.addProperty("item", v); }).build());
                 sub.add(entry.startIntField(Component.translatable("trackertips.gui.event.count"),
                                 getInt(triggerJson, "count", 1))
                         .setMin(1).setMax(99999)
+                        .setTooltip(Component.translatable("trackertips.gui.event.count.tooltip"))
                         .setSaveConsumer(v -> { if (activeType[0] == type) triggerJson.addProperty("count", v); }).build());
             }
             case ADVANCEMENT -> {
@@ -730,30 +781,41 @@ public final class TTClothEventEditor {
                                 AdvancementMode.from(getString(triggerJson, "mode", "done")))
                         .setEnumNameProvider(value -> Component.translatable("trackertips.gui.event.advancement_mode." + ((AdvancementMode) value).id))
                         .setDefaultValue(AdvancementMode.DONE)
+                        .setTooltip(Component.translatable("trackertips.gui.event.advancement_mode.tooltip"))
                         .setSaveConsumer(v -> { if (activeType[0] == type) triggerJson.addProperty("mode", v.id); })
                         .build());
                 sub.add(entry.startStrField(Component.translatable("trackertips.gui.event.advancement_id"),
                                 getString(triggerJson, "id", "minecraft:story/root"))
+                        .setTooltip(Component.translatable("trackertips.gui.event.advancement_id.tooltip"))
                         .setSaveConsumer(v -> { if (activeType[0] == type) triggerJson.addProperty("id", v); }).build());
             }
             case IN_DIMENSION -> sub.add(entry.startStrField(
                             Component.translatable("trackertips.gui.event.dimension"),
                             getString(triggerJson, "dimension", "minecraft:the_nether"))
-                    .setSaveConsumer(v -> { if (activeType[0] == type) triggerJson.addProperty("dimension", v); }).build());
+                    .setTooltip(Component.translatable("trackertips.gui.event.dimension.tooltip"))
+                        .setSaveConsumer(v -> { if (activeType[0] == type) triggerJson.addProperty("dimension", v); }).build());
             case HEALTH_BELOW -> sub.add(entry.startFloatField(
                             Component.translatable("trackertips.gui.event.health"),
                             getFloat(triggerJson, "health", 6.0F))
                     .setMin(0).setMax(1000)
-                    .setSaveConsumer(v -> { if (activeType[0] == type) triggerJson.addProperty("health", v); }).build());
+                    .setTooltip(Component.translatable("trackertips.gui.event.health.tooltip"))
+                        .setSaveConsumer(v -> { if (activeType[0] == type) triggerJson.addProperty("health", v); }).build());
             case KILL_ENTITY -> sub.add(entry.startStrField(
                             Component.translatable("trackertips.gui.event.entity"),
                             getString(triggerJson, "entity", "minecraft:zombie"))
-                    .setSaveConsumer(v -> { if (activeType[0] == type) triggerJson.addProperty("entity", v); }).build());
+                    .setTooltip(Component.translatable("trackertips.gui.event.entity.tooltip"))
+                        .setSaveConsumer(v -> { if (activeType[0] == type) triggerJson.addProperty("entity", v); }).build());
             case MINE_BLOCK -> sub.add(entry.startStrField(
                             Component.translatable("trackertips.gui.event.block"),
                             getString(triggerJson, "block", "minecraft:stone"))
-                    .setSaveConsumer(v -> { if (activeType[0] == type) triggerJson.addProperty("block", v); }).build());
+                    .setTooltip(Component.translatable("trackertips.gui.event.block.tooltip"))
+                        .setSaveConsumer(v -> { if (activeType[0] == type) triggerJson.addProperty("block", v); }).build());
             case FIRST_JOIN -> { /* no extra fields */ }
+            case IN_STRUCTURE -> sub.add(entry.startStrField(
+                            Component.translatable("trackertips.gui.event.structure"),
+                            getString(triggerJson, "structure", "minecraft:village_plains"))
+                    .setTooltip(Component.translatable("trackertips.gui.event.structure.tooltip"))
+                        .setSaveConsumer(v -> { if (activeType[0] == type) triggerJson.addProperty("structure", v); }).build());
         }
 
         category.addEntry(sub.build());
@@ -762,7 +824,7 @@ public final class TTClothEventEditor {
     private static void replaceTriggerType(JsonObject trigger, TriggerType type) {
         List<String> known = List.of(
                 "mode", "time", "end_time", "effect", "amplifier_min", "item", "count",
-                "id", "dimension", "health", "entity", "block"
+                "id", "dimension", "health", "entity", "block", "structure"
         );
         for (String key : known) trigger.remove(key);
         trigger.addProperty("type", type.id);

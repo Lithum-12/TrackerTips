@@ -26,6 +26,13 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Stream;
 
+/**
+ * Registers and implements {@code /trackertips} (and its optional {@code /tt} shorthand).
+ *
+ * <p>Every message this class sends is a {@link Component#translatable} lookup - see the
+ * {@code trackertips.command.*} lang keys - so the whole command surface follows the invoking
+ * player's client language like the rest of the mod, rather than being hard-coded to English.
+ */
 public class TTCommands {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
@@ -99,7 +106,7 @@ public class TTCommands {
         CommandSourceStack source = context.getSource();
 
         String displayName = "TrackerTips";
-        String version = "unknown";
+        String version = null;
         try {
             IModInfo info = ModList.get().getModContainerById(TrackerTips.MODID)
                     .map(container -> container.getModInfo())
@@ -112,8 +119,8 @@ public class TTCommands {
             TrackerTips.LOGGER.warn("Failed to resolve TrackerTips mod info for /trackertips about", e);
         }
 
-        String mcVersion = "unknown";
-        String forgeVersion = "unknown";
+        String mcVersion = null;
+        String forgeVersion = null;
         try {
             mcVersion = SharedConstants.getCurrentVersion().getName();
         } catch (Exception ignored) {}
@@ -122,17 +129,23 @@ public class TTCommands {
         } catch (Exception ignored) {}
 
         final String finalDisplayName = displayName;
-        final String finalVersion = version;
-        final String finalMcVersion = mcVersion;
-        final String finalForgeVersion = forgeVersion;
+        final Component versionComponent = version != null
+                ? Component.literal(version)
+                : Component.translatable("trackertips.command.about.unknown");
+        final Component mcVersionComponent = mcVersion != null
+                ? Component.literal(mcVersion)
+                : Component.translatable("trackertips.command.about.unknown");
+        final Component forgeVersionComponent = forgeVersion != null
+                ? Component.literal(forgeVersion)
+                : Component.translatable("trackertips.command.about.unknown");
 
-        source.sendSuccess(() -> Component.literal(finalDisplayName + " v" + finalVersion)
+        source.sendSuccess(() -> Component.translatable("trackertips.command.about.header", finalDisplayName, versionComponent)
                 .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD), false);
-        source.sendSuccess(() -> Component.literal("Minecraft " + finalMcVersion + "  |  Forge " + finalForgeVersion)
+        source.sendSuccess(() -> Component.translatable("trackertips.command.about.versions", mcVersionComponent, forgeVersionComponent)
                 .withStyle(ChatFormatting.GRAY), false);
-        source.sendSuccess(() -> Component.literal("Loaded hints: " + TTConfigManager.hints().size())
+        source.sendSuccess(() -> Component.translatable("trackertips.command.about.hints", TTConfigManager.hints().size())
                 .withStyle(ChatFormatting.GRAY), false);
-        source.sendSuccess(() -> Component.literal("Mod ID: " + TrackerTips.MODID)
+        source.sendSuccess(() -> Component.translatable("trackertips.command.about.modid", TrackerTips.MODID)
                 .withStyle(ChatFormatting.DARK_GRAY), false);
         return 1;
     }
@@ -147,16 +160,20 @@ public class TTCommands {
                 : TTConfigManager.worldFolder(source.getServer());
         Path settingsFile = folder.resolve(scope == ListScope.GLOBAL ? "global_config.json" : "world_config.json");
         Path hintsFolder = folder.resolve("hints");
-        String label = scope == ListScope.GLOBAL ? "global" : "save-specific";
+        Component scopeLabel = Component.translatable(scope == ListScope.GLOBAL
+                ? "trackertips.command.list.scope.global"
+                : "trackertips.command.list.scope.saves");
 
-        source.sendSuccess(() -> Component.literal("TrackerTips " + label + " configuration")
+        source.sendSuccess(() -> Component.translatable("trackertips.command.list.header", scopeLabel)
                 .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD), false);
-        source.sendSuccess(() -> Component.literal(folder.toString())
+        source.sendSuccess(() -> Component.translatable("trackertips.command.list.path", folder.toString())
                 .withStyle(ChatFormatting.DARK_GRAY), false);
 
         boolean settingsExists = Files.exists(settingsFile);
         String settingsName = settingsFile.getFileName().toString();
-        source.sendSuccess(() -> Component.literal((settingsExists ? "  \u2713 " : "  \u2717 ") + settingsName)
+        source.sendSuccess(() -> Component.translatable(
+                        settingsExists ? "trackertips.command.list.settings_found" : "trackertips.command.list.settings_missing",
+                        settingsName)
                 .withStyle(settingsExists ? ChatFormatting.GREEN : ChatFormatting.RED), false);
 
         List<String> hintFiles;
@@ -166,16 +183,19 @@ public class TTCommands {
                     .sorted()
                     .toList();
         } catch (IOException e) {
-            source.sendFailure(Component.literal("Failed to read " + hintsFolder).withStyle(ChatFormatting.RED));
+            source.sendFailure(Component.translatable("trackertips.command.list.read_failed", hintsFolder.toString())
+                    .withStyle(ChatFormatting.RED));
             return 0;
         }
 
         if (hintFiles.isEmpty()) {
-            source.sendSuccess(() -> Component.literal("  hints/ (no files)").withStyle(ChatFormatting.GRAY), false);
+            source.sendSuccess(() -> Component.translatable("trackertips.command.list.hints_empty").withStyle(ChatFormatting.GRAY), false);
         } else {
-            source.sendSuccess(() -> Component.literal("  hints/ (" + hintFiles.size() + "):").withStyle(ChatFormatting.GRAY), false);
+            source.sendSuccess(() -> Component.translatable("trackertips.command.list.hints_header", hintFiles.size())
+                    .withStyle(ChatFormatting.GRAY), false);
             for (String name : hintFiles) {
-                source.sendSuccess(() -> Component.literal("    - " + name).withStyle(ChatFormatting.WHITE), false);
+                source.sendSuccess(() -> Component.translatable("trackertips.command.list.hint_entry", name)
+                        .withStyle(ChatFormatting.WHITE), false);
             }
         }
         return 1;

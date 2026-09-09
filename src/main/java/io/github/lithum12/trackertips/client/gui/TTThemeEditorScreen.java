@@ -1,6 +1,5 @@
 package io.github.lithum12.trackertips.client.gui;
 
-import com.google.gson.JsonParseException;
 import io.github.lithum12.trackertips.theme.TTAnimation;
 import io.github.lithum12.trackertips.theme.TTTheme;
 import io.github.lithum12.trackertips.theme.TTThemeManager;
@@ -34,6 +33,7 @@ public final class TTThemeEditorScreen {
         general.addEntry(entry.startStrField(
                 Component.translatable("trackertips.gui.theme.id"), base.id())
                 .setDefaultValue(base.id())
+                .setTooltip(Component.translatable("trackertips.gui.theme.id.tooltip"))
                 .setSaveConsumer(v -> {
                     // IDs are immutable for an existing theme. For new themes this is
                     // accepted and used when the file is saved.
@@ -43,6 +43,7 @@ public final class TTThemeEditorScreen {
         general.addEntry(entry.startStrField(
                 Component.translatable("trackertips.gui.theme.name"), base.name())
                 .setDefaultValue(base.name())
+                .setTooltip(Component.translatable("trackertips.gui.theme.name.tooltip"))
                 .setSaveConsumer(v -> working.get().setName(v)).build());
 
         ConfigCategory card = builder.getOrCreateCategory(
@@ -60,18 +61,21 @@ public final class TTThemeEditorScreen {
                 Component.translatable("trackertips.gui.theme.border_width"), base.borderWidth())
                 .setDefaultValue(1)
                 .setMin(0).setMax(8)
+                .setTooltip(Component.translatable("trackertips.gui.theme.border_width.tooltip"))
                 .setSaveConsumer(working.get()::setBorderWidth).build());
 
         card.addEntry(entry.startIntField(
                 Component.translatable("trackertips.gui.theme.corner_radius"), base.cornerRadius())
                 .setDefaultValue(4)
                 .setMin(0).setMax(16)
+                .setTooltip(Component.translatable("trackertips.gui.theme.corner_radius.tooltip"))
                 .setSaveConsumer(working.get()::setCornerRadius).build());
 
         card.addEntry(entry.startIntField(
                 Component.translatable("trackertips.gui.theme.padding"), base.padding())
                 .setDefaultValue(8)
                 .setMin(0).setMax(32)
+                .setTooltip(Component.translatable("trackertips.gui.theme.padding.tooltip"))
                 .setSaveConsumer(working.get()::setPadding).build());
 
         ConfigCategory animation = builder.getOrCreateCategory(
@@ -95,6 +99,7 @@ public final class TTThemeEditorScreen {
         String hex = String.format("%06X", value & 0xFFFFFF);
         category.addEntry(entry.startColorField(Component.translatable(key), value)
                 .setDefaultValue(value)
+                .setTooltip(Component.translatable(key + ".tooltip"))
                 .setSaveConsumer(consumerValue -> consumer.accept(String.format("%06X", consumerValue & 0xFFFFFF)))
                 .build());
     }
@@ -106,6 +111,7 @@ public final class TTThemeEditorScreen {
                 value -> Component.translatable("trackertips.gui.theme.animation.type." + value))
                 .setSelections(java.util.List.of("none", "fade", "slide", "slide_up"))
                 .setDefaultValue("fade")
+                .setTooltip(Component.translatable(key + ".type.tooltip"))
                 .setSaveConsumer(value -> {
                     TTAnimation old = card ? working.get().cardAnimation() : working.get().textAnimation();
                     TTAnimation next = new TTAnimation(value, old.duration(), old.delay());
@@ -117,6 +123,7 @@ public final class TTThemeEditorScreen {
                 Component.translatable(key + ".duration"), animation.duration())
                 .setDefaultValue(animation.duration())
                 .setMin(0).setMax(200)
+                .setTooltip(Component.translatable(key + ".duration.tooltip"))
                 .setSaveConsumer(value -> {
                     TTAnimation old = card ? working.get().cardAnimation() : working.get().textAnimation();
                     TTAnimation next = new TTAnimation(old.type(), value, old.delay());
@@ -128,6 +135,7 @@ public final class TTThemeEditorScreen {
                 Component.translatable(key + ".delay"), animation.delay())
                 .setDefaultValue(animation.delay())
                 .setMin(0).setMax(200)
+                .setTooltip(Component.translatable(key + ".delay.tooltip"))
                 .setSaveConsumer(value -> {
                     TTAnimation old = card ? working.get().cardAnimation() : working.get().textAnimation();
                     TTAnimation next = new TTAnimation(old.type(), old.duration(), value);

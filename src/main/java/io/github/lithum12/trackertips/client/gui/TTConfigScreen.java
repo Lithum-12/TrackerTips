@@ -1,5 +1,6 @@
 package io.github.lithum12.trackertips.client.gui;
 
+import io.github.lithum12.trackertips.config.HintAnchor;
 import io.github.lithum12.trackertips.config.TTClientConfig;
 import io.github.lithum12.trackertips.config.TTConfigManager;
 import io.github.lithum12.trackertips.config.TTSettings;
@@ -32,6 +33,7 @@ import java.util.Set;
 
 /** TrackerTips configuration hub using Minecraft 1.20.1's native TabNavigationBar. */
 public class TTConfigScreen extends Screen {
+
     private final Screen parent;
     private final HeaderAndFooterLayout layout;
     private final TabManager tabManager;
@@ -53,6 +55,8 @@ public class TTConfigScreen extends Screen {
     private int pendingFadeOut;
     private int pendingCheckInterval;
     private int pendingDefaultDuration;
+    private HintAnchor pendingAnchor;
+    private boolean pendingAvoidChatOverlap;
 
     private final Set<Path> pendingDeletedEvents = new LinkedHashSet<>();
     private final Set<String> pendingDeletedThemes = new LinkedHashSet<>();
@@ -116,6 +120,8 @@ public class TTConfigScreen extends Screen {
         this.pendingFadeOut = state.currentFadeOut();
         this.pendingCheckInterval = state.currentCheckInterval();
         this.pendingDefaultDuration = state.currentDefaultDuration();
+        this.pendingAnchor = state.pendingAnchor;
+        this.pendingAvoidChatOverlap = state.pendingAvoidChatOverlap;
         this.pendingDeletedEvents.addAll(state.pendingDeletedEvents);
         this.pendingDeletedThemes.addAll(state.pendingDeletedThemes);
         this.pendingEventBackups.putAll(state.pendingEventBackups);
@@ -130,6 +136,8 @@ public class TTConfigScreen extends Screen {
         pendingMaxHints = TTClientConfig.MAX_HINTS.get();
         pendingFadeIn = TTClientConfig.FADE_IN.get();
         pendingFadeOut = TTClientConfig.FADE_OUT.get();
+        pendingAnchor = TTClientConfig.ANCHOR.get();
+        pendingAvoidChatOverlap = TTClientConfig.AVOID_CHAT_OVERLAP.get();
 
         TTSettings settings = TTConfigManager.readGlobalSettings();
         pendingDebug = settings.debug;
@@ -292,6 +300,24 @@ public class TTConfigScreen extends Screen {
         return pendingShortcutCommand;
     }
 
+    void setPendingAnchor(HintAnchor value) {
+        pendingAnchor = value;
+        markChanged();
+    }
+
+    HintAnchor pendingAnchor() {
+        return pendingAnchor;
+    }
+
+    void setPendingAvoidChatOverlap(boolean value) {
+        pendingAvoidChatOverlap = value;
+        markChanged();
+    }
+
+    boolean pendingAvoidChatOverlap() {
+        return pendingAvoidChatOverlap;
+    }
+
     void setOffsetXBox(net.minecraft.client.gui.components.EditBox box) { offsetXBox = box; }
     void setOffsetYBox(net.minecraft.client.gui.components.EditBox box) { offsetYBox = box; }
     void setMaxWidthBox(net.minecraft.client.gui.components.EditBox box) { maxWidthBox = box; }
@@ -413,6 +439,8 @@ public class TTConfigScreen extends Screen {
         TTClientConfig.MAX_HINTS.set(clamp(pendingMaxHints, 1, 10));
         TTClientConfig.FADE_IN.set(clamp(pendingFadeIn, 1, 100));
         TTClientConfig.FADE_OUT.set(clamp(pendingFadeOut, 1, 100));
+        TTClientConfig.ANCHOR.set(pendingAnchor);
+        TTClientConfig.AVOID_CHAT_OVERLAP.set(pendingAvoidChatOverlap);
         TTClientConfig.SPEC.save();
 
         TTSettings settings = TTConfigManager.readGlobalSettings();

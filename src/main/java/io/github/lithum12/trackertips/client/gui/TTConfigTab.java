@@ -2,9 +2,8 @@ package io.github.lithum12.trackertips.client.gui;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
-import io.github.lithum12.trackertips.config.TTClientConfig;
+import io.github.lithum12.trackertips.config.HintAnchor;
 import io.github.lithum12.trackertips.config.TTConfigManager;
-import io.github.lithum12.trackertips.theme.TTAnimation;
 import io.github.lithum12.trackertips.theme.TTTheme;
 import io.github.lithum12.trackertips.theme.TTThemeManager;
 import net.minecraft.client.Minecraft;
@@ -59,6 +58,8 @@ final class TTConfigTab extends GridLayoutTab {
     private static final boolean DEFAULT_DEBUG = false;
     private static final int DEFAULT_DEFAULT_DURATION = 240;
     private static final boolean DEFAULT_SHORTCUT_COMMAND = false;
+    private static final HintAnchor DEFAULT_ANCHOR = HintAnchor.BOTTOM_LEFT;
+    private static final boolean DEFAULT_AVOID_CHAT_OVERLAP = true;
 
     enum Kind {
         GENERAL, EVENTS, THEMES, USAGE;
@@ -77,7 +78,7 @@ final class TTConfigTab extends GridLayoutTab {
         super(Component.translatable(kind.translationKey()));
         this.screen = screen;
         this.kind = kind;
-        layout.columnSpacing(16).rowSpacing(8);
+        layout.columnSpacing(24).rowSpacing(8);
         build();
     }
 
@@ -126,6 +127,32 @@ final class TTConfigTab extends GridLayoutTab {
         add(numberBox(offsetYLabel, screen.currentOffsetY(), 0, 1000, DEFAULT_OFFSET_Y), row, 1);
         screen.setOffsetYBox((EditBox) widgets.get(widgets.size() - 1));
         row++;
+
+        TTLabel anchorLabel = label("trackertips.gui.anchor", row);
+        HintAnchor initialAnchor = screen.pendingAnchor();
+        anchorLabel.setItalic(initialAnchor != DEFAULT_ANCHOR);
+        add(CycleButton.<HintAnchor>builder(anchor -> Component.translatable(
+                        "trackertips.gui.anchor." + anchor.name().toLowerCase(java.util.Locale.ROOT)))
+                .withValues(HintAnchor.values())
+                .withInitialValue(initialAnchor)
+                .create(0, 0, 150, 20, Component.empty(),
+                        (button, value) -> {
+                            screen.setPendingAnchor(value);
+                            anchorLabel.setItalic(value != DEFAULT_ANCHOR);
+                        }), row++, 1);
+
+        TTLabel avoidChatLabel = label("trackertips.gui.avoid_chat_overlap", row);
+        boolean initialAvoidChat = screen.pendingAvoidChatOverlap();
+        avoidChatLabel.setItalic(initialAvoidChat != DEFAULT_AVOID_CHAT_OVERLAP);
+        add(CycleButton.booleanBuilder(
+                Component.translatable("trackertips.value.yes"),
+                Component.translatable("trackertips.value.no"))
+                .withInitialValue(initialAvoidChat)
+                .create(0, 0, 150, 20, Component.empty(),
+                        (button, value) -> {
+                            screen.setPendingAvoidChatOverlap(value);
+                            avoidChatLabel.setItalic(value != DEFAULT_AVOID_CHAT_OVERLAP);
+                        }), row++, 1);
 
         TTLabel maxWidthLabel = label("trackertips.gui.max_width", row);
         add(numberBox(maxWidthLabel, screen.currentMaxWidth(), 120, 600, DEFAULT_MAX_WIDTH), row, 1);
@@ -351,9 +378,21 @@ final class TTConfigTab extends GridLayoutTab {
         viewLeft = rectangle.left();
         viewRight = rectangle.right();
 
-        layout.setX(rectangle.left() + 20);
+        layout.setX(rectangle.left());
         layout.setY(rectangle.top() + 12);
         layout.arrangeElements();
+
+        // Feature: center the tab's content horizontally within the available area instead of
+        // always hugging the left edge with a large, unused gap on wide screens. GridLayout
+        // reports its own arranged size via getWidth() once laid out, so measure once at the
+        // left edge, then re-arrange at the horizontally-centered X.
+        int availableWidth = rectangle.right() - rectangle.left();
+        int naturalWidth = layout.getWidth();
+        int centeredX = rectangle.left() + Math.max(0, (availableWidth - naturalWidth) / 2);
+        if (centeredX != rectangle.left()) {
+            layout.setX(centeredX);
+            layout.arrangeElements();
+        }
 
         // Bug fix: previously nothing tracked content taller than the visible tab area, so an
         // Events/Themes list with enough entries simply ran off the bottom of the screen with

@@ -1,6 +1,7 @@
 package io.github.lithum12.trackertips.client;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import io.github.lithum12.trackertips.config.HintAnchor;
 import io.github.lithum12.trackertips.config.TTClientConfig;
 import io.github.lithum12.trackertips.theme.TTAnimation;
 import io.github.lithum12.trackertips.theme.TTTheme;
@@ -18,6 +19,8 @@ import java.util.List;
 @OnlyIn(Dist.CLIENT)
 public class HintRenderer {
     private static final int DEFAULT_PADDING = 8;
+    /** Gap, in pixels, kept clear between the reserved chat area and a left-anchored hint stack. */
+    private static final int CHAT_MARGIN = 8;
 
     public static void render(GuiGraphics guiGraphics, int screenWidth, int screenHeight) {
         Minecraft minecraft = Minecraft.getInstance();
@@ -26,13 +29,18 @@ public class HintRenderer {
 
         Font font = minecraft.font;
         int lineHeight = font.lineHeight + 2;
-        int x = TTClientConfig.OFFSET_X.get();
-        int bottom = screenHeight - TTClientConfig.OFFSET_Y.get();
         int configuredMaxWidth = TTClientConfig.MAX_WIDTH.get();
         int safeMaxWidth = Math.min(configuredMaxWidth, (screenWidth / 2) - 100);
         int maxWidth = Math.max(120, safeMaxWidth);
         int maxHints = TTClientConfig.MAX_HINTS.get();
         int drawn = 0;
+
+        // Feature: configurable anchor. x only depends on maxWidth/screenWidth (constant for the
+        // whole stack), so it's computed once; the vertical cursor is what advances per hint.
+        HintAnchor anchor = TTClientConfig.ANCHOR.get();
+        int x = anchorX(anchor, minecraft, screenWidth, maxWidth);
+        boolean growsDown = anchor.growsDown();
+        int cursorY = anchorStartY(anchor, screenHeight);
 
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
@@ -67,8 +75,11 @@ public class HintRenderer {
             // stackY is the card's resting (fully-settled) position and is what the stack is
             // built from; animationOffset is now applied only to this card's own on-screen
             // position, not to where the next card's slot begins.
-            int stackY = bottom - height;
-            int y = stackY + animationOffset;
+            int stackY = growsDown ? cursorY : cursorY - height;
+            // Cards slide in from the direction of the screen edge they're anchored to: a
+            // bottom-anchored stack enters from below (unchanged from the original behavior),
+            // a top/middle-anchored stack enters from above.
+            int y = stackY + (growsDown ? -animationOffset : animationOffset);
             int a = Math.max(24, (int) (animationProgress * 255));
 
             drawPanel(guiGraphics, x, y, maxWidth, height, a, theme);
@@ -103,11 +114,50 @@ public class HintRenderer {
                 currentY += lineHeight;
             }
 
-            bottom = stackY - 4;
+            cursorY = growsDown ? stackY + height + 4 : stackY - 4;
             drawn++;
         }
 
         RenderSystem.disableBlend();
+    }
+
+    /**
+     * Feature: configurable anchor. Horizontal position of the hint stack's left edge, for the
+     * given anchor's {@link HintAnchor#horizontal()}. Also applies the chat-overlap safeguard
+     * (see {@link TTClientConfig#AVOID_CHAT_OVERLAP}) for left-touching anchors.
+     */
+    private static int anchorX(HintAnchor anchor, Minecraft minecraft, int screenWidth, int maxWidth) {
+        int offsetX = TTClientConfig.OFFSET_X.get();
+        int x = switch (anchor.horizontal()) {
+            case LEFT -> offsetX;
+            case RIGHT -> screenWidth - offsetX - maxWidth;
+            case CENTER -> (screenWidth - maxWidth) / 2;
+        };
+
+        // Bug fix: a left-anchored hint could render directly underneath the chat log's
+        // semi-transparent background, making it unreadable. When enabled, this reserves the
+        // chat's configured width (regardless of whether it currently has visible messages, so
+        // the hint position doesn't shift as chat fades) and pushes the hint stack clear of it.
+        if (anchor.touchesLeftEdge() && TTClientConfig.AVOID_CHAT_OVERLAP.get()) {
+            try {
+                int chatWidth = minecraft.gui.getChat().getWidth();
+                x = Math.max(x, chatWidth + CHAT_MARGIN);
+            } catch (Exception ignored) {
+                // If the chat widget isn't available for some reason, fall back to the
+                // unadjusted position rather than failing to render the hint at all.
+            }
+        }
+        return x;
+    }
+
+    /** Feature: configurable anchor. Starting vertical cursor for the given anchor's {@link HintAnchor#vertical()}. */
+    private static int anchorStartY(HintAnchor anchor, int screenHeight) {
+        int offsetY = TTClientConfig.OFFSET_Y.get();
+        return switch (anchor.vertical()) {
+            case TOP -> offsetY;
+            case BOTTOM -> screenHeight - offsetY;
+            case MIDDLE -> screenHeight / 2;
+        };
     }
 
     private static float animationProgress(float alpha, TTAnimation animation) {

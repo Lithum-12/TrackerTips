@@ -58,6 +58,7 @@ public final class Triggers {
         register(new ResourceLocation(TrackerTips.MODID, "kill_entity"), KillEntityTrigger::fromJson);
         register(new ResourceLocation(TrackerTips.MODID, "mine_block"), MineBlockTrigger::fromJson);
         register(new ResourceLocation(TrackerTips.MODID, "first_join"), FirstJoinTrigger::fromJson);
+        register(new ResourceLocation(TrackerTips.MODID, "in_structure"), StructureTrigger::fromJson);
     }
 
     /**
