@@ -16,6 +16,14 @@ plugins {
     id 'net.minecraftforge.gradle' version '[6.0.16,6.2)'
 }
 
+/*
+ * Versioning scheme (MAJOR.MINOR), defined in gradle.properties as `mod_version`:
+ *   MAJOR - incremented by 1 for every major update (new features / systems).
+ *           MAJOR only ever grows; it is never reset.
+ *   MINOR - the number of files changed in the release commit.
+ *           Reset to the changed-file count on a major update;
+ *           accumulates across minor-only updates.
+ */
 group = mod_group_id
 version = mod_version
 
