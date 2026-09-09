@@ -19,7 +19,9 @@ This mod is still under development – most features are not yet complete, and 
 
 A lightweight, customizable hint overlay mod, similar to the vanilla toast notifications.
 
-When a player meets certain conditions, a hint with an icon, title and body text pops up in the corner of the screen.
+When a player meets certain conditions, a hint with an icon, title and body text pops up on the screen. Hints can be anchored to any of the 8 screen positions (including above the hotbar), with an option to avoid overlapping the chat area.
+
+Features include **persistent hints** (stay while a condition holds, e.g. low health), **chained hints** (a shown hint can listen for a follow-up trigger and then dismiss itself or reveal the next hint — great for guided tutorial sequences), and fully customizable **themes** (colors, border, corner radius, entrance animations).
 
 Just write a JSON file under the config folder – or edit it through Cloth Config API – to easily customize text, colors, and even entrance animations.
 
@@ -67,16 +69,27 @@ Client-side config files:
 
 The current version supports the following triggers:
 
-- `First_join`
-- `Item_obtained`
-- `Kill_entity`
-- `Mine_block`
-- `Potion_added`
-- `Potion_removed`
-- `Advancement`
-- `Dimension_change`
+- `game_time` – at/after/before/in-range of a day-time
+- `first_join` – the first time a player joins the world
+- `has_item` – player is holding/has an item
+- `item_obtained` – player picks up an item
+- `kill_entity` – player kills an entity
+- `mine_block` – player mines a block
+- `potion_added` / `potion_removed` / `potion_active` – mob effect events & persistent state
+- `advancement` – advancement done / state
+- `dimension_change` – player enters a dimension
+- `in_dimension` – player is in a dimension
+- `in_structure` – player is inside a structure (e.g. a village)
 
-`triggers` allows other mods to register new triggers through the public entry point, and can also ship their own language and theme files.
+### For Developers
+
+Other mods can extend TrackerTips through public entry points:
+
+- `Triggers.register(...)` – register custom trigger types
+- `TTConfigManager.registerHintProvider(...)` – ship hint definitions programmatically (no hand-written JSON needed)
+- `TTThemeManager.registerBuiltIn(...)` – register built-in themes (user JSON files can still override them)
+
+See [`PROMPT.md`](PROMPT.md) for the full API documentation.
 
 #### Versions
 
